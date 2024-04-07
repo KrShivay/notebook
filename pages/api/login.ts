@@ -15,7 +15,20 @@ async function init() {
   }
 }
 
-export default async function loginHandler(req, res) {
+export default async function loginHandler(
+  req: {body: {email: any; password: any}; method: string},
+  res: {
+    send: (arg0: {responseCode: number; responseMessage: string}) => void;
+    status: (arg0: number) => {
+      (): any;
+      new (): any;
+      json: {
+        (arg0: {code: number; message: string; data?: any}): void;
+        new (): any;
+      };
+    };
+  }
+) {
   const {email, password} = req.body;
   if (!email || !password) {
     res.send({
@@ -54,7 +67,12 @@ export default async function loginHandler(req, res) {
       const hashedPassword = password; // Replace with your password hashing logic
 
       // Create new user document
-      const newUser = {email, password: hashedPassword, createdOn: new Date()};
+      const newUser = {
+        email,
+        password: hashedPassword,
+        createdOn: new Date(),
+        _id: "",
+      };
 
       // Insert new user
       await users.insertOne(newUser, function (err: Error) {

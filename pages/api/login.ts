@@ -11,7 +11,6 @@ export async function init() {
     db = await client.db();
     users = db.collection("users");
     console.log("Database connected >>>>");
-    return true;
   } catch (error) {
     throw new Error("Failed to stablish connection to database");
   }

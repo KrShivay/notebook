@@ -4,13 +4,14 @@ let client: any;
 let db: any | undefined;
 let users: any;
 
-async function init() {
+export async function init() {
   if (db) return;
   try {
     client = await clientPromise;
     db = await client.db();
     users = db.collection("users");
     console.log("Database connected >>>>");
+    return true;
   } catch (error) {
     throw new Error("Failed to stablish connection to database");
   }
@@ -54,7 +55,7 @@ export default async function loginHandler(
           return;
         } else {
           res.status(200).json({
-            code: 400,
+            code: 200,
             message: "Email already exists",
             data: existingUser,
           });

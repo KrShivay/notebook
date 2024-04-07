@@ -27,6 +27,7 @@ import {
   getLocalStorageItem,
   setLocalStorageItem,
 } from "utils/fucntions/handleLocalStorage";
+import {init} from "./api/login";
 
 type Inputs = {
   email: string;
@@ -57,6 +58,7 @@ export default function LoginForm() {
 
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
     setLoading(true);
+    await init();
     await fetch("/api/login", {
       method: "POST", // Set request method to POST
       headers: {"Content-Type": "application/json"}, // Set content type for JSON data
@@ -64,7 +66,7 @@ export default function LoginForm() {
     })
       .then((resp) => resp.json())
       .then((resp): void => {
-        if (resp.code == 201) {
+        if (resp.code == 201 || resp.code == 200) {
           setLocalStorageItem("email", data.email);
           setLocalStorageItem("user", resp.data);
           toast.success(resp.message);

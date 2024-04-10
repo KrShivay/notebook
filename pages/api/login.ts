@@ -1,96 +1,78 @@
 import clientPromise from "lib/mongodb";
+import {NextApiRequest, NextApiResponse} from "next";
 
-let client: any;
-let db: any | undefined;
-let users: any;
+let db: any; // Type 'any' should be avoided whenever possible
 
-export async function init() {
-  if (db) return;
-  try {
-    client = await clientPromise;
-    db = await client.db();
-    users = db.collection("users");
-    console.log("Database connected >>>>");
-  } catch (error) {
-    throw new Error("Failed to stablish connection to database");
-  }
+async function initDB() {
+  if (db) return db;
+
+  const client = await clientPromise;
+  db = client.db(); // Assuming client.db() returns the database instance
+  console.log("Database connected");
+  return db;
 }
 
 export default async function loginHandler(
-  req: {body: {email: any; password: any}; method: string},
-  res: {
-    send: (arg0: {responseCode: number; responseMessage: string}) => void;
-    status: (arg0: number) => {
-      (): any;
-      new (): any;
-      json: {
-        (arg0: {code: number; message: string; data?: any}): void;
-        new (): any;
-      };
-    };
-  }
+  req: NextApiRequest,
+  res: NextApiResponse<{code: number; message: string; data?: any}>
 ) {
-  const {email, password} = req.body;
-  if (!email || !password) {
-    res.send({
-      responseCode: 401,
-      responseMessage: "Invalid email or password",
-    });
+  const {method, body} = req;
+  const {email, password} = body;
+
+  if (method !== "POST") {
+    res.status(405).json({code: 405, message: "Method Not Allowed"});
+    return;
   }
 
-  if (req.method === "POST") {
-    try {
-      if (!users) await init();
+  if (!email || !password) {
+    res.status(401).json({code: 401, message: "Invalid email or password"});
+    return;
+  }
 
-      // Check if email exists
-      const existingUser = await users.findOne({email});
+  try {
+    const db = await initDB();
+    const users = db.collection("users");
 
-      if (existingUser) {
-        if (!existingUser.password === password) {
-          res.status(200).json({
-            code: 400,
-            message: "Invalid email/password",
-          });
-          return;
-        } else {
-          res.status(200).json({
+    // Check if email exists
+    const existingUser = await users.findOne({email});
+
+    if (existingUser) {
+      if (existingUser.password !== password) {
+        res.status(400).json({code: 400, message: "Invalid email/password"});
+        return;
+      } else {
+        res
+          .status(200)
+          .json({
             code: 200,
             message: "Email already exists",
             data: existingUser,
           });
-          return;
-        }
+        return;
       }
-
-      // Hash password before storing (recommended for security)
-      // You'll need to install a library like bcryptjs for password hashing
-      // const hashedPassword = await hashPassword(password); // Replace with your password hashing logic
-      const hashedPassword = password; // Replace with your password hashing logic
-
-      // Create new user document
-      const newUser = {
-        email,
-        password: hashedPassword,
-        createdOn: new Date(),
-        _id: "",
-      };
-
-      // Insert new user
-      await users.insertOne(newUser, function (err: Error) {
-        if (err) return;
-        // Object inserted successfully.
-        var objectId = newUser._id; // this will return the id of object inserted
-      });
-      console.log({newUser});
-      res
-        .status(200)
-        .json({code: 201, message: "User created successfully", data: newUser});
-    } catch (error) {
-      console.error(error);
-      res.status(200).json({code: 500, message: "Internal server error"});
-    } finally {
     }
-  } else {
-    res.status(200).json({code: 405, message: "Method Not Allowed"});
+
+    // Hash password before storing (recommended for security)
+    // Replace this with your password hashing logic
+    // const hashedPassword = await hashPassword(password);
+    const hashedPassword = password;
+
+    // Create new user document
+    const newUser = {
+      email,
+      password: hashedPassword,
+      createdOn: new Date(),
+      _id: "", // Replace with the actual ID after insertion
+    };
+
+    // Insert new user
+    await users.insertOne(newUser);
+
+    res
+      .status(201)
+      .json({code: 201, message: "User created successfully", data: newUser});
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({code: 500, message: "Internal server error"});
   }
 }

@@ -1,4 +1,6 @@
-import {Button} from "../ui/button";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "../ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,66 +9,35 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import {Input} from "../ui/input";
-import {Sheet, SheetContent, SheetTrigger} from "../ui/sheet";
-import {CircleUser, Menu, Package2, Search} from "lucide-react";
-import Link from "next/link";
+import { Input } from "../ui/input";
+import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet";
+import { CircleUser, Menu, Package2, Search } from "lucide-react";
+import { useSession } from "@/context/SessionContext";
+import { toast } from "react-toastify";
 
 export default function Navbar() {
+  const { session, setSession } = useSession();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('session');
+    setSession(null);
+    toast.success('Logged out successfully');
+    router.push('/');
+  };
+
   return (
     <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
       <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
         <Link
-          href="#"
+          href="/dashboard"
           className="flex items-center gap-2 text-lg font-semibold md:text-base"
         >
           <Package2 className="h-6 w-6" />
-          <span className="sr-only">Acme Inc</span>
-        </Link>
-        <Link
-          href="#"
-          className="text-foreground transition-colors hover:text-foreground"
-        >
-          Dashboard
-        </Link>
-        <Link
-          href="/invoice"
-          className="text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Invoice
-        </Link>
-        <Link
-          href="/invoice-component"
-          className="text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Invoice Component
-        </Link>
-        <Link
-          href="#"
-          className="text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Products
-        </Link>
-        <Link
-          href="#"
-          className="text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Customers
-        </Link>
-        <Link
-          href="#"
-          className="text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Analytics
+          <span>Invoice App</span>
         </Link>
       </nav>
       <nav className="flex items-center space-x-4 lg:space-x-6">
-        <Link
-          href="/"
-          className="text-sm font-medium transition-colors hover:text-primary"
-        >
-          Overview
-        </Link>
         <Link
           href="/dashboard"
           className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
@@ -77,7 +48,7 @@ export default function Navbar() {
           href="/generate-invoice"
           className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
         >
-          Generate Invoice
+          Invoice
         </Link>
       </nav>
       <Sheet>
@@ -90,38 +61,20 @@ export default function Navbar() {
         <SheetContent side="left">
           <nav className="grid gap-6 text-lg font-medium">
             <Link
-              href="#"
+              href="/dashboard"
               className="flex items-center gap-2 text-lg font-semibold"
             >
               <Package2 className="h-6 w-6" />
-              <span className="sr-only">Acme Inc</span>
+              <span>Invoice App</span>
             </Link>
-            <Link href="#" className="hover:text-foreground">
+            <Link href="/dashboard" className="hover:text-foreground">
               Dashboard
             </Link>
             <Link
-              href="#"
+              href="/generate-invoice"
               className="text-muted-foreground hover:text-foreground"
             >
-              Orders
-            </Link>
-            <Link
-              href="#"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Products
-            </Link>
-            <Link
-              href="#"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Customers
-            </Link>
-            <Link
-              href="#"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Analytics
+              Invoice
             </Link>
           </nav>
         </SheetContent>
@@ -132,7 +85,7 @@ export default function Navbar() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search products..."
+              placeholder="Search invoices..."
               className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px]"
             />
           </div>
@@ -145,12 +98,13 @@ export default function Navbar() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              {session?.email || 'My Account'}
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuItem>Support</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>Logout</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
+              Logout
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

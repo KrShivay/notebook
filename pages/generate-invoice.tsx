@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useState, useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { numberToWords } from '../utils/number-to-words';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { supplierData } from '../data/supplier';
-import { clientData } from '../data/client';
+import { useData } from '@/context/DataContext';
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
 import {
   Form,
   FormControl,
@@ -15,7 +16,6 @@ import {
   FormMessage,
 } from '../components/ui/form';
 import { Button } from '../components/ui/button';
-import { Calendar } from '../components/ui/calendar';
 import {
   Select,
   SelectContent,
@@ -23,17 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '../components/ui/popover';
 import { Input } from '../components/ui/input';
-import { cn } from '../lib/utils';
-import { CalendarIcon } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { useInvoice } from '../context/InvoiceContext';
+import { useSession } from '@/context/SessionContext';
+import { useForm as useFormContext } from "@/context/FormContext";
 import Navbar from '../components/navbar';
+import { toast } from 'react-toastify';
 
 const formSchema = z.object({
   supplier: z.string(),
@@ -41,7 +37,18 @@ const formSchema = z.object({
   client: z.string(),
   monthYear: z.date(),
   days: z.string()
+    .refine(val => !isNaN(parseInt(val)) && parseInt(val) > 0 && parseInt(val) <= 31, {
+      message: "Days must be between 1 and 31"
+    })
 });
+
+type FormValues = {
+  supplier: string;
+  invoiceDate: Date;
+  client: string;
+  monthYear: Date;
+  days: string;
+};
 
 const generateInvoiceNumber = (supplier: string) => {
   const now = new Date();
@@ -50,233 +57,244 @@ const generateInvoiceNumber = (supplier: string) => {
   const day = String(now.getDate()).padStart(2, '0');
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
-  const dayOfYear = String(Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / 86400000)).padStart(3, '0');
-  const base = year.toString();
+  const seconds = String(now.getSeconds()).padStart(2, '0');
   
-  switch(supplier) {
-    case 'joel':
-      return base + Math.floor(Math.random() * 90) + dayOfYear + hours + minutes;
-    case 'neetu':
-      return '24' + dayOfYear + Math.floor(Math.random() * 90) + hours + minutes + Math.floor(Math.random() * 900);
-    case 'shubhlika':
-      return '17' + hours + minutes + Math.floor(Math.random() * 90) + dayOfYear +  Math.floor(Math.random() * 9000);
-    default:
-      return base + hours + minutes;
-  }
-};
-
-type FormValues = {
-  supplier: keyof typeof supplierData;
-  invoiceDate: Date;
-  client: keyof typeof clientData;
-  monthYear: Date;
-  days: string;
+  const supplierPrefix = supplier.substring(0, 2).toUpperCase();
+  return `${supplierPrefix}${year}${month}${day}${hours}${minutes}${seconds}`;
 };
 
 const GenerateInvoice = () => {
+  const { formData, updateFormData, resetFormData } = useFormContext();
+  const { suppliers, clients, loading: dataLoading, error: dataError } = useData();
   const [loading, setLoading] = useState(false);
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      supplier: undefined,
-      invoiceDate: undefined,
-      client: undefined,
-      monthYear: undefined,
-      days: undefined,
-    }
-  });
+  const { session } = useSession();
   const router = useRouter();
   const { setInvoiceData } = useInvoice();
 
-  const onSubmit = async (data: FormValues) => {
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      supplier: formData.supplier || "",
+      client: formData.client || "",
+      invoiceDate: formData.invoiceDate || null,
+      monthYear: formData.monthYear || null,
+      days: formData.days || "",
+    },
+  });
+
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      updateFormData(value);
+    });
+    return () => subscription.unsubscribe();
+  }, [form, updateFormData]);
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
+      if (!session?.email) {
+        toast.error('Session expired. Please login again.');
+        return;
+      }
+
       setLoading(true);
-      const supplier = supplierData[data.supplier];
-      const client = clientData[data.client];
-      const amount = parseInt(data.days) * supplier.rate;
+      const supplier = suppliers.find(s => s._id === values.supplier);
+      const client = clients.find(c => c._id === values.client);
       
-      const monthYear = new Date(data.monthYear);
+      if (!supplier || !client) {
+        toast.error('Invalid supplier or client selected');
+        return;
+      }
+
+      const amount = parseInt(values.days) * supplier.rate;
+      
+      const monthYear = new Date(values.monthYear);
       const invoiceData = {
-        invoiceNumber: generateInvoiceNumber(data.supplier),
-        invoiceDate: format(data.invoiceDate, 'dd MMM yyyy'),
+        invoiceNumber: generateInvoiceNumber(values.supplier),
+        invoiceDate: format(values.invoiceDate, 'dd MMM yyyy'),
         startDate: format(startOfMonth(monthYear), 'dd MMM yyyy'),
         endDate: format(endOfMonth(monthYear), 'dd MMM yyyy'),
-        days: parseInt(data.days),
+        days: parseInt(values.days),
         amount: amount,
-        amountInWords: numberToWords(amount),
+        amountInWords: `₹${numberToWords(amount)} only`,
         supplier: supplier,
-        client: client
+        client: client,
+        userEmail: session.email
       };
 
+      const response = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(invoiceData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate invoice');
+      }
+
       setInvoiceData(invoiceData);
+      toast.success('Invoice generated successfully');
       router.push('/invoice-component');
-      setLoading(false);
+      resetFormData();
     } catch (error) {
       console.error('Error generating invoice:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to generate invoice');
+    } finally {
       setLoading(false);
     }
   };
 
+  if (dataLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading suppliers and clients...</div>;
+  }
+
+  if (dataError) {
+    return <div className="flex items-center justify-center min-h-screen text-red-500">{dataError}</div>;
+  }
+
   return (
-    <div className="flex min-h-screen w-full flex-col">
+    <div className="min-h-screen bg-background">
       <Navbar />
-
-      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Generate Invoice</h1>
-        </div>
-        
+      <div className="container mx-auto py-10">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <FormField
-              control={form.control}
-              name="supplier"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Supplier</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select supplier" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="joel">Joel James</SelectItem>
-                      <SelectItem value="neetu">Neetu Balyan</SelectItem>
-                      <SelectItem value="shubhlika">Shubhlika Srivastava</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="invoiceDate"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Invoice Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="supplier"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Supplier</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-[240px] pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select supplier" />
+                        </SelectTrigger>
                       </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={(date) =>
-                          date > new Date() || date < new Date("1900-01-01")
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                      <SelectContent>
+                        {suppliers.map((supplier) => (
+                          <SelectItem key={supplier._id} value={supplier._id!}>
+                            {supplier.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="client"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Client</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select client" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="scorich">Scorich Services Pvt. Ltd.</SelectItem>
-                      <SelectItem value="yoomoney">Yoomoney Fintech Services</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="monthYear"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Month and Year</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
+              <FormField
+                control={form.control}
+                name="client"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Client</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-[240px] pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, "MMMM yyyy")
-                          ) : (
-                            <span>Pick a month</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select client" />
+                        </SelectTrigger>
                       </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={(date) =>
-                          date > new Date() || date < new Date("1900-01-01")
-                        }
-                        initialFocus
+                      <SelectContent>
+                        {clients.map((client) => (
+                          <SelectItem key={client._id} value={client._id!}>
+                            {client.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="invoiceDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Invoice Date</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <DatePicker
+                          selected={field.value}
+                          onChange={(date: Date) => field.onChange(date)}
+                          dateFormat="dd/MM/yyyy"
+                          maxDate={new Date()}
+                          placeholderText="Select invoice date"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="monthYear"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Month and Year</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <DatePicker
+                          selected={field.value}
+                          onChange={(date: Date) => field.onChange(date)}
+                          dateFormat="MMMM yyyy"
+                          showMonthYearPicker
+                          placeholderText="Select month and year"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="days"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Number of Days</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="1" 
+                        max="31" 
+                        {...field}
+                        className="w-full"
+                        placeholder="Enter number of days (1-31)"
                       />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-            <FormField
-              control={form.control}
-              name="days"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Number of Days</FormLabel>
-                  <FormControl>
-                    <Input type="number" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+            <Button 
+              type="submit" 
+              disabled={loading}
+              className="w-full mt-6"
+            >
+              {loading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+                  <span>Generating...</span>
+                </div>
+              ) : (
+                'Generate Invoice'
               )}
-            />
-
-            <Button type="submit" disabled={loading}>
-              {loading ? "Generating..." : "Generate Invoice"}
             </Button>
           </form>
         </Form>
-      </main>
+      </div>
     </div>
   );
 };

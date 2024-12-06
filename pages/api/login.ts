@@ -1,78 +1,88 @@
-import clientPromise from "lib/mongodb";
-import {NextApiRequest, NextApiResponse} from "next";
+import { NextApiRequest, NextApiResponse } from 'next';
+import { connectToDatabase } from '../../lib/mongodb';
+import { v4 as uuidv4 } from 'uuid';
+import { hash, compare } from 'bcryptjs';
+import { AuthResponse } from '@/types/session';
 
-let db: any; // Type 'any' should be avoided whenever possible
-
-async function initDB() {
-  if (db) return db;
-
-  const client = await clientPromise;
-  db = client.db(); // Assuming client.db() returns the database instance
-  console.log("Database connected");
-  return db;
-}
-
-export default async function loginHandler(
+export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<{code: number; message: string; data?: any}>
+  res: NextApiResponse<AuthResponse>
 ) {
-  const {method, body} = req;
-  const {email, password} = body;
-
-  if (method !== "POST") {
-    res.status(405).json({code: 405, message: "Method Not Allowed"});
-    return;
-  }
-
-  if (!email || !password) {
-    res.status(401).json({code: 401, message: "Invalid email or password"});
-    return;
+  if (req.method !== 'POST') {
+    return res.status(405).json({
+      success: false,
+      message: 'Method not allowed',
+    });
   }
 
   try {
-    const db = await initDB();
-    const users = db.collection("users");
+    const { email, password, clientInfo } = req.body;
 
-    // Check if email exists
-    const existingUser = await users.findOne({email});
-
-    if (existingUser) {
-      if (existingUser.password !== password) {
-        res.status(400).json({code: 400, message: "Invalid email/password"});
-        return;
-      } else {
-        res
-          .status(200)
-          .json({
-            code: 200,
-            message: "Email already exists",
-            data: existingUser,
-          });
-        return;
-      }
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required',
+      });
     }
 
-    // Hash password before storing (recommended for security)
-    // Replace this with your password hashing logic
-    // const hashedPassword = await hashPassword(password);
-    const hashedPassword = password;
+    const { db } = await connectToDatabase().catch((error) => {
+      console.error('Database connection error:', error);
+      throw new Error('Database connection failed');
+    });
 
-    // Create new user document
-    const newUser = {
-      email,
-      password: hashedPassword,
-      createdOn: new Date(),
-      _id: "", // Replace with the actual ID after insertion
+    const user = await db.collection('users').findOne({ email });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password',
+      });
+    }
+
+    const isPasswordValid = await compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password',
+      });
+    }
+
+    // Create session
+    const sessionId = uuidv4();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+
+    const session = {
+      sessionId,
+      userId: user._id,
+      email: user.email,
+      createdAt: now,
+      expiresAt,
+      clientInfo: {
+        ...clientInfo,
+        timestamp: now,
+      },
     };
 
-    // Insert new user
-    await users.insertOne(newUser);
+    await db.collection('sessions').insertOne(session).catch((error) => {
+      console.error('Session creation error:', error);
+      throw new Error('Failed to create session');
+    });
 
-    res
-      .status(201)
-      .json({code: 201, message: "User created successfully", data: newUser});
+    // Remove sensitive data from session
+    const { userId, ...sessionData } = session;
+
+    return res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      sessionData,
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({code: 500, message: "Internal server error"});
+    console.error('Login error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : 'An unexpected error occurred',
+    });
   }
 }

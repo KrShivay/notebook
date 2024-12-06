@@ -1,35 +1,41 @@
 import React from "react";
+import { Address } from "@/types/supplier";
 
 interface InvoiceData {
-    invoiceNumber: string;
-    invoiceDate: string;
-    startDate: string;
-    endDate: string;
-    days: number;
-    amount: number;
-    amountInWords: string;
-    supplier: {
-        name: string;
-        address: string;
-        pan: string;
-        bank: {
-            name: string;
-            bankName: string;
-            accountNo: string;
-            ifsc: string;
-        };
-        rate: number;
+  invoiceNumber: string;
+  invoiceDate: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  amount: number;
+  amountInWords: string;
+  supplier: {
+    name: string;
+    address: Address;
+    pan: string;
+    bankDetails: {
+      accountName: string;
+      accountNumber: string;
+      bankName: string;
+      ifscCode: string;
+      branch: string;
     };
-    client: {
-        name: string;
-        address: string;
-        gstin: string;
-    };
+    rate: number;
+  };
+  client: {
+    name: string;
+    address: Address;
+    gstin: string;
+  };
 }
 
 interface InvoiceComponentProps {
-    data: InvoiceData;
+  data: InvoiceData;
 }
+
+const formatAddress = (address: Address): string => {
+  return `${address.street}, ${address.city}, ${address.state} ${address.pincode}`;
+};
 
 const InvoiceComponent: React.FC<InvoiceComponentProps> = ({ data }) => {
   const tableStyles = {
@@ -82,7 +88,7 @@ const InvoiceComponent: React.FC<InvoiceComponentProps> = ({ data }) => {
           <tr>
             <td style={cellStyles}>
               {data?.supplier?.name} <br />
-              {data?.supplier?.address}
+              {data?.supplier?.address && formatAddress(data.supplier.address)}
               <br />
               PAN: {data?.supplier?.pan}
             </td>
@@ -91,7 +97,7 @@ const InvoiceComponent: React.FC<InvoiceComponentProps> = ({ data }) => {
               <br />
               {data?.client?.name}
               <br />
-              {data?.client?.address}
+              {data?.client?.address && formatAddress(data.client.address)}
               <br />
               GSTIN/UIN: {data?.client?.gstin}
             </td>
@@ -136,13 +142,15 @@ const InvoiceComponent: React.FC<InvoiceComponentProps> = ({ data }) => {
             <td style={cellStyles}>
               Bank Account Details:
               <br />
-              Name: {data?.supplier?.bank?.name}
+              Name: {data?.supplier?.bankDetails?.accountName}
               <br />
-              Bank Name: {data?.supplier?.bank?.bankName}
+              Bank Name: {data?.supplier?.bankDetails?.bankName}
               <br />
-              A/C No: {data?.supplier?.bank?.accountNo}
+              A/C No: {data?.supplier?.bankDetails?.accountNumber}
               <br />
-              IFSC: {data?.supplier?.bank?.ifsc}
+              IFSC: {data?.supplier?.bankDetails?.ifscCode}
+              <br />
+              Branch: {data?.supplier?.bankDetails?.branch}
               <br />
               PAN: {data?.supplier?.pan}
             </td>

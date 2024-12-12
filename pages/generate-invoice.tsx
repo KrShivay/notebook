@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useForm, Controller } from 'react-hook-form';
-import { z } from 'zod';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { numberToWords } from '../utils/number-to-words';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useData } from '@/context/DataContext';
@@ -31,24 +31,26 @@ import { useForm as useFormContext } from "@/context/FormContext";
 import Navbar from '../components/navbar';
 import { toast } from 'react-toastify';
 
-const formSchema = z.object({
-  supplier: z.string(),
-  invoiceDate: z.date(),
-  client: z.string(),
-  monthYear: z.date(),
+const invoiceItemSchema = z.object({
+  description: z.string().min(1, 'Description is required'),
+  quantity: z.number().min(1, 'Quantity must be at least 1'),
+  rate: z.number().min(0, 'Rate must be non-negative'),
+  amount: z.number().min(0, 'Amount must be non-negative')
+});
+
+const invoiceSchema = z.object({
+  supplier: z.string().min(1, 'Supplier is required'),
+  invoiceDate: z.date().min(new Date(), 'Invoice date must be today or later'),
+  client: z.string().min(1, 'Client is required'),
+  monthYear: z.date().min(new Date(), 'Month and year must be today or later'),
   days: z.string()
     .refine(val => !isNaN(parseInt(val)) && parseInt(val) > 0 && parseInt(val) <= 31, {
       message: "Days must be between 1 and 31"
-    })
+    }),
+  items: z.array(invoiceItemSchema).min(1, 'At least one item is required'),
 });
 
-type FormValues = {
-  supplier: string;
-  invoiceDate: Date;
-  client: string;
-  monthYear: Date;
-  days: string;
-};
+type InvoiceFormData = z.infer<typeof invoiceSchema>;
 
 const generateInvoiceNumber = (supplier: string) => {
   const now = new Date();
@@ -71,25 +73,48 @@ const GenerateInvoice = () => {
   const router = useRouter();
   const { setInvoiceData } = useInvoice();
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const [invoiceDate, setInvoiceDate] = useState<Date>(new Date());
+  const [monthYear, setMonthYear] = useState<Date>(new Date());
+
+  const handleInvoiceDateChange = (date: Date | null) => {
+    if (date) {
+      setInvoiceDate(date);
+    }
+  };
+
+  const handleMonthYearChange = (date: Date | null) => {
+    if (date) {
+      setMonthYear(date);
+    }
+  };
+
+  const methods = useForm<InvoiceFormData>({
+    resolver: zodResolver(invoiceSchema),
     defaultValues: {
       supplier: formData.supplier || "",
       client: formData.client || "",
-      invoiceDate: formData.invoiceDate || null,
-      monthYear: formData.monthYear || null,
+      invoiceDate: invoiceDate,
+      monthYear: monthYear,
       days: formData.days || "",
+      items: [{ description: '', quantity: 1, rate: 0, amount: 0 }],
     },
   });
 
+  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = methods;
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'items'
+  });
+
   useEffect(() => {
-    const subscription = form.watch((value) => {
+    const subscription = watch((value) => {
       updateFormData(value);
     });
     return () => subscription.unsubscribe();
-  }, [form, updateFormData]);
+  }, [watch, updateFormData]);
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: InvoiceFormData) => {
     try {
       if (!session?.email) {
         toast.error('Session expired. Please login again.');
@@ -107,7 +132,6 @@ const GenerateInvoice = () => {
 
       const amount = parseInt(values.days) * supplier.rate;
       
-      const monthYear = new Date(values.monthYear);
       const invoiceData = {
         invoiceNumber: generateInvoiceNumber(values.supplier),
         invoiceDate: format(values.invoiceDate, 'dd MMM yyyy'),
@@ -145,6 +169,14 @@ const GenerateInvoice = () => {
     }
   };
 
+  const calculateItemAmount = (index: number) => {
+    const item = fields[index];
+    if (item && item.quantity && item.rate) {
+      const amount = item.quantity * item.rate;
+      setValue(`items.${index}.amount`, amount);
+    }
+  };
+
   if (dataLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading suppliers and clients...</div>;
   }
@@ -157,11 +189,11 @@ const GenerateInvoice = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container mx-auto py-10">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-w-4xl mx-auto">
+        <Form {...methods}>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-4xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
-                control={form.control}
+                control={control}
                 name="supplier"
                 render={({ field }) => (
                   <FormItem>
@@ -174,7 +206,7 @@ const GenerateInvoice = () => {
                       </FormControl>
                       <SelectContent>
                         {suppliers.map((supplier) => (
-                          <SelectItem key={supplier._id} value={supplier._id!}>
+                          <SelectItem key={supplier._id!} value={supplier._id!}>
                             {supplier.name}
                           </SelectItem>
                         ))}
@@ -186,7 +218,7 @@ const GenerateInvoice = () => {
               />
 
               <FormField
-                control={form.control}
+                control={control}
                 name="client"
                 render={({ field }) => (
                   <FormItem>
@@ -199,7 +231,7 @@ const GenerateInvoice = () => {
                       </FormControl>
                       <SelectContent>
                         {clients.map((client) => (
-                          <SelectItem key={client._id} value={client._id!}>
+                          <SelectItem key={client._id!} value={client._id!}>
                             {client.name}
                           </SelectItem>
                         ))}
@@ -211,7 +243,7 @@ const GenerateInvoice = () => {
               />
 
               <FormField
-                control={form.control}
+                control={control}
                 name="invoiceDate"
                 render={({ field }) => (
                   <FormItem>
@@ -219,8 +251,8 @@ const GenerateInvoice = () => {
                     <FormControl>
                       <div className="relative">
                         <DatePicker
-                          selected={field.value}
-                          onChange={(date: Date) => field.onChange(date)}
+                          selected={invoiceDate}
+                          onChange={handleInvoiceDateChange}
                           dateFormat="dd/MM/yyyy"
                           maxDate={new Date()}
                           placeholderText="Select invoice date"
@@ -234,7 +266,7 @@ const GenerateInvoice = () => {
               />
 
               <FormField
-                control={form.control}
+                control={control}
                 name="monthYear"
                 render={({ field }) => (
                   <FormItem>
@@ -242,8 +274,8 @@ const GenerateInvoice = () => {
                     <FormControl>
                       <div className="relative">
                         <DatePicker
-                          selected={field.value}
-                          onChange={(date: Date) => field.onChange(date)}
+                          selected={monthYear}
+                          onChange={handleMonthYearChange}
                           dateFormat="MMMM yyyy"
                           showMonthYearPicker
                           placeholderText="Select month and year"
@@ -257,7 +289,7 @@ const GenerateInvoice = () => {
               />
 
               <FormField
-                control={form.control}
+                control={control}
                 name="days"
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
@@ -276,6 +308,89 @@ const GenerateInvoice = () => {
                   </FormItem>
                 )}
               />
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-medium">Invoice Items</h2>
+                <button
+                  type="button"
+                  onClick={() => append({ description: '', quantity: 1, rate: 0, amount: 0 })}
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+                >
+                  Add Item
+                </button>
+              </div>
+
+              {fields.map((field, index) => (
+                <div key={field.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border rounded-md">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Description</label>
+                    <input
+                      {...register(`items.${index}.description`)}
+                      type="text"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    />
+                    {errors.items?.[index]?.description && (
+                      <p className="mt-1 text-sm text-red-600">{errors.items[index]?.description?.message}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Quantity</label>
+                    <input
+                      {...register(`items.${index}.quantity`)}
+                      type="number"
+                      min="1"
+                      onChange={(e) => {
+                        register(`items.${index}.quantity`).onChange(e);
+                        calculateItemAmount(index);
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    />
+                    {errors.items?.[index]?.quantity && (
+                      <p className="mt-1 text-sm text-red-600">{errors.items[index]?.quantity?.message}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Rate</label>
+                    <input
+                      {...register(`items.${index}.rate`)}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      onChange={(e) => {
+                        register(`items.${index}.rate`).onChange(e);
+                        calculateItemAmount(index);
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    />
+                    {errors.items?.[index]?.rate && (
+                      <p className="mt-1 text-sm text-red-600">{errors.items[index]?.rate?.message}</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center space-x-4">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700">Amount</label>
+                      <input
+                        {...register(`items.${index}.amount`)}
+                        type="number"
+                        readOnly
+                        className="mt-1 block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => remove(index)}
+                      className="mt-6 p-2 text-red-600 hover:text-red-800"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
 
             <Button 

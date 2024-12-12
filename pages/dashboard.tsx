@@ -1,40 +1,27 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import Navbar from "../components/navbar";
 import { useSession } from "@/context/SessionContext";
 import { fetchWithErrorHandling } from "@/utils/api-error";
-import { ErrorBoundary } from 'react-error-boundary';
+import { PopulatedInvoice } from "@/types/models";
+import { format } from 'date-fns';
+import { Bar } from 'react-chartjs-2';
+import { ChartData, Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { IndianRupee, TrendingUp, Users, FileText } from 'lucide-react';
+import SupplierInvoiceView from '../components/SupplierInvoiceView';
+import { useRouter } from 'next/router';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
-import { Bar, Line } from 'react-chartjs-2';
-import { IndianRupee, TrendingUp, Users, FileText } from 'lucide-react';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  Title,
-  Tooltip,
-  Legend
-} from 'chart.js';
-
-import SupplierInvoiceView from "../components/SupplierInvoiceView";
+import { ErrorBoundary } from 'react-error-boundary';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   BarElement,
-  LineElement,
-  PointElement,
   Title,
   Tooltip,
   Legend
 );
-
-import { useRouter } from 'next/router';
 
 const MONTH_COLORS = [
   'rgba(147, 51, 234, 0.8)',  // Purple
@@ -51,27 +38,28 @@ const MONTH_COLORS = [
   'rgba(249, 115, 22, 0.8)'   // Orange
 ];
 
-const SUPPLIER_COLORS = {
-  'Joel': 'rgba(147, 51, 234, 1)',      // Purple
-  'Shubhlika': 'rgba(59, 130, 246, 1)', // Blue
-  'Ayushi': 'rgba(16, 185, 129, 1)',    // Green
-  'Scorich': 'rgba(245, 158, 11, 1)',   // Amber
-  'YooMoney': 'rgba(239, 68, 68, 1)',   // Red
-  'Default': 'rgba(14, 165, 233, 1)',   // Sky
+interface SupplierColors {
+  [key: string]: string;
+  Joel: string;
+  Shubhlika: string;
+  Ayushi: string;
+  Scorich: string;
+  YooMoney: string;
+  Default: string;
+}
+
+const supplierColors: SupplierColors = {
+  Joel: 'rgba(75, 192, 192, 1)',
+  Shubhlika: 'rgba(255, 99, 132, 1)',
+  Ayushi: 'rgba(54, 162, 235, 1)',
+  Scorich: 'rgba(153, 102, 255, 1)',
+  YooMoney: 'rgba(255, 159, 64, 1)',
+  Default: 'rgba(201, 203, 207, 1)'
 };
 
-interface Invoice {
-  invoiceNumber: string;
-  invoiceDate: string;
-  amount: number;
-  client: {
-    name: string;
-  };
-  supplier: {
-    name: string;
-  };
-  createdAt: string;
-}
+const getSupplierColor = (supplier: string): string => {
+  return supplierColors[supplier] || supplierColors.Default;
+};
 
 interface SupplierData {
   name: string;
@@ -90,21 +78,17 @@ function ErrorFallback({ error }: { error: Error }) {
 export default function Dashboard() {
   const { session, loading: sessionLoading } = useSession();
   const router = useRouter();
-  const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
+  const [recentInvoices, setRecentInvoices] = useState<PopulatedInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [monthlyData, setMonthlyData] = useState<{ name: string; total: number; }[]>([]);
   const [supplierData, setSupplierData] = useState<SupplierData[]>([]);
-  const [supplierMonthlyData, setSupplierMonthlyData] = useState<{
-    labels: string[];
-    datasets: {
-      label: string;
-      data: number[];
-      backgroundColor: string;
-    }[];
-  }>({ labels: [], datasets: [] });
+  const [supplierMonthlyData, setSupplierMonthlyData] = useState<ChartData<'bar'>>({
+    labels: [],
+    datasets: []
+  });
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [data, setData] = useState<Invoice[]>([]);
+  const [data, setData] = useState<PopulatedInvoice[]>([]);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -117,10 +101,10 @@ export default function Dashboard() {
 
         console.log('Fetching invoices for email:', session.email);
 
-        const startDate = startOfMonth(selectedDate);
-        const endDate = endOfMonth(selectedDate);
+        const startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
 
-        const data = await fetchWithErrorHandling<Invoice[]>(
+        const data = await fetchWithErrorHandling<PopulatedInvoice[]>(
           `/api/invoices?email=${encodeURIComponent(session.email)}`
         );
 
@@ -128,25 +112,70 @@ export default function Dashboard() {
 
         // Sort and filter invoices for the selected month
         const filteredInvoices = data.filter(invoice => {
-          const invoiceDate = new Date(invoice.invoiceDate);
+          const invoiceDate = new Date(invoice.dueDate);
           return invoiceDate >= startDate && invoiceDate <= endDate;
         });
 
-        // Get total invoice count for the month
-        const totalMonthlyInvoices = filteredInvoices.length;
-
         // Sort by date and limit to 6 most recent
         const sortedInvoices = filteredInvoices
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime())
           .slice(0, 6);
 
         setRecentInvoices(sortedInvoices);
 
+        // Process supplier data for the selected month
+        const supplierTotals = filteredInvoices.reduce((acc, invoice) => {
+          const supplierName = invoice.supplier.name;
+          acc[supplierName] = (acc[supplierName] || 0) + invoice.total;
+          return acc;
+        }, {} as Record<string, number>);
+
+        const supplierDataArray = Object.entries(supplierTotals)
+          .map(([name, total]) => ({ name, total }))
+          .sort((a, b) => b.total - a.total);
+
+        setSupplierData(supplierDataArray);
+
+        // Get last 6 months for supplier breakdown
+        const last6Months = Array.from({ length: 6 }, (_, i) => {
+          const d = new Date();
+          d.setMonth(d.getMonth() - i);
+          return format(d, 'MMM yyyy');
+        }).reverse();
+
+        // Process supplier monthly data
+        const supplierMonthlyTotals: Record<string, Record<string, number>> = {};
+
+        data.forEach(invoice => {
+          const monthYear = format(new Date(invoice.dueDate), 'MMM yyyy');
+          if (last6Months.includes(monthYear)) {
+            const supplierName = invoice.supplier.name;
+            if (!supplierMonthlyTotals[supplierName]) {
+              supplierMonthlyTotals[supplierName] = {};
+            }
+            if (!supplierMonthlyTotals[supplierName][monthYear]) {
+              supplierMonthlyTotals[supplierName][monthYear] = 0;
+            }
+            supplierMonthlyTotals[supplierName][monthYear] += invoice.total;
+          }
+        });
+
+        const datasets = Object.entries(supplierMonthlyTotals).map(([supplier, monthlyData]) => ({
+          label: supplier,
+          data: last6Months.map(month => monthlyData[month] || 0),
+          backgroundColor: getSupplierColor(supplier),
+        }));
+
+        setSupplierMonthlyData({
+          labels: last6Months,
+          datasets,
+        });
+
         // Process monthly data
         const monthlyTotals = data.reduce((acc, invoice) => {
-          const date = new Date(invoice.invoiceDate);
+          const date = new Date(invoice.dueDate);
           const monthYear = date.toLocaleString('default', { month: 'short', year: 'numeric' });
-          acc[monthYear] = (acc[monthYear] || 0) + invoice.amount;
+          acc[monthYear] = (acc[monthYear] || 0) + invoice.total;
           return acc;
         }, {} as Record<string, number>);
 
@@ -160,52 +189,6 @@ export default function Dashboard() {
           .slice(-12);
 
         setMonthlyData(monthlyDataArray);
-
-        // Process supplier data for the selected month
-        const supplierTotals = filteredInvoices.reduce((acc, invoice) => {
-          const supplierName = invoice.supplier.name;
-          acc[supplierName] = (acc[supplierName] || 0) + invoice.amount;
-          return acc;
-        }, {} as Record<string, number>);
-
-        const supplierDataArray = Object.entries(supplierTotals)
-          .map(([name, total]) => ({ name, total }))
-          .sort((a, b) => b.total - a.total);
-
-        setSupplierData(supplierDataArray);
-
-        // Process supplier monthly data
-        const last6Months = Array.from({ length: 6 }, (_, i) => {
-          const date = subMonths(new Date(), i);
-          return format(date, 'MMM yyyy');
-        }).reverse();
-
-        const supplierMonthlyTotals: Record<string, Record<string, number>> = {};
-
-        data.forEach(invoice => {
-          const monthYear = format(new Date(invoice.invoiceDate), 'MMM yyyy');
-          if (last6Months.includes(monthYear)) {
-            const supplierName = invoice.supplier.name;
-            if (!supplierMonthlyTotals[supplierName]) {
-              supplierMonthlyTotals[supplierName] = {};
-            }
-            if (!supplierMonthlyTotals[supplierName][monthYear]) {
-              supplierMonthlyTotals[supplierName][monthYear] = 0;
-            }
-            supplierMonthlyTotals[supplierName][monthYear] += invoice.amount;
-          }
-        });
-
-        const datasets = Object.entries(supplierMonthlyTotals).map(([supplier, monthlyData], index) => ({
-          label: supplier,
-          data: last6Months.map(month => monthlyData[month] || 0),
-          backgroundColor: SUPPLIER_COLORS[supplier] || SUPPLIER_COLORS['Default'],
-        }));
-
-        setSupplierMonthlyData({
-          labels: last6Months,
-          datasets,
-        });
       } catch (error) {
         console.error('Error fetching invoices:', error);
         setError(error instanceof Error ? error.message : 'Failed to fetch invoices');
@@ -233,7 +216,11 @@ export default function Dashboard() {
             <div className="w-48">
               <DatePicker
                 selected={selectedDate}
-                onChange={(date: Date) => setSelectedDate(date)}
+                onChange={(date: Date | null) => {
+                  if (date) {
+                    setSelectedDate(date);
+                  }
+                }}
                 dateFormat="MMMM yyyy"
                 showMonthYearPicker
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -307,11 +294,10 @@ export default function Dashboard() {
             <Card className="col-span-4">
               <CardHeader>
                 <CardTitle>Monthly Overview</CardTitle>
-                <CardDescription>Revenue trends over months</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px]">
-                  <Line
+                  <Bar
                     data={{
                       labels: monthlyData.map(d => d.name),
                       datasets: [{
@@ -319,18 +305,9 @@ export default function Dashboard() {
                         data: monthlyData.map(d => d.total),
                         borderColor: MONTH_COLORS.map(color => color.replace('0.8', '1')),
                         backgroundColor: MONTH_COLORS,
-                        segment: {
-                          borderColor: (ctx) => {
-                            if (!ctx.p0.skip && !ctx.p1.skip) {
-                              return MONTH_COLORS[ctx.p0DataIndex % MONTH_COLORS.length];
-                            }
-                          }
-                        },
-                        pointBackgroundColor: (context) => {
-                          const index = context.dataIndex;
-                          return MONTH_COLORS[index % MONTH_COLORS.length];
-                        },
-                        tension: 0.1
+                        borderWidth: 1,
+                        hoverBackgroundColor: MONTH_COLORS.map(color => color.replace('0.8', '0.9')),
+                        hoverBorderColor: MONTH_COLORS.map(color => color.replace('0.8', '1'))
                       }]
                     }}
                     options={{
@@ -366,7 +343,6 @@ export default function Dashboard() {
             <Card className="col-span-3">
               <CardHeader>
                 <CardTitle>Supplier Overview</CardTitle>
-                <CardDescription>Revenue by supplier for {format(selectedDate, 'MMMM yyyy')}</CardDescription>
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -382,8 +358,8 @@ export default function Dashboard() {
                         labels: supplierData.map(d => d.name),
                         datasets: [{
                           data: supplierData.map(d => d.total),
-                          backgroundColor: supplierData.map(supplier => SUPPLIER_COLORS[supplier.name] || SUPPLIER_COLORS['Default']),
-                          borderColor: supplierData.map(supplier => SUPPLIER_COLORS[supplier.name] || SUPPLIER_COLORS['Default']),
+                          backgroundColor: supplierData.map(supplier => getSupplierColor(supplier.name)),
+                          borderColor: supplierData.map(supplier => getSupplierColor(supplier.name)),
                           borderWidth: 1
                         }]
                       }}
@@ -422,17 +398,16 @@ export default function Dashboard() {
 
           <SupplierInvoiceView 
             invoices={data} 
-            supplierColors={SUPPLIER_COLORS}
+            supplierColors={supplierColors}
           />
 
           <Card className="col-span-7">
             <CardHeader>
               <CardTitle>Supplier Monthly Comparison</CardTitle>
-              <CardDescription>Revenue trends by supplier over last 6 months</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
-                <Line
+                <Bar
                   data={supplierMonthlyData}
                   options={{
                     responsive: true,
@@ -464,7 +439,6 @@ export default function Dashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Supplier Monthly Trends</CardTitle>
-              <CardDescription>Revenue by supplier over the last 6 months</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -541,7 +515,7 @@ export default function Dashboard() {
                         </p>
                       </div>
                       <div className="ml-auto font-medium">
-                        ₹{invoice.amount.toLocaleString()}
+                        ₹{invoice.total.toLocaleString()}
                       </div>
                     </div>
                   ))}

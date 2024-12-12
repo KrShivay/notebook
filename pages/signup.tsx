@@ -1,31 +1,40 @@
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useState } from 'react';
+import { useRouter } from 'next/router';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { toast } from 'react-toastify';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader } from "@/components/ui/loader";
 import { useSession } from "@/context/SessionContext";
-import { fetchWithErrorHandling, getErrorMessage } from "@/utils/api-error";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "react-toastify";
-import Link from "next/link";
+import { fetchWithErrorHandling } from "@/utils/api-error";
+import { useEffect } from "react";
+import Link from 'next/link';
 
-const formSchema = z.object({
-  name: z.string().min(2, {
-    message: "Name must be at least 2 characters.",
-  }),
-  email: z.string().email(),
-  password: z.string().min(6, {
-    message: "Password must be at least 6 characters.",
-  }),
-  confirmPassword: z.string(),
+const signupSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
-  path: ["confirmPassword"],
+  path: ["confirmPassword"]
 });
+
+type SignupFormData = z.infer<typeof signupSchema>;
+
+interface ApiResponse {
+  success: boolean;
+  data?: {
+    _id: string;
+    email: string;
+    name: string;
+  };
+  error?: string;
+}
 
 export default function SignupPage() {
   const { loading: sessionLoading } = useSession();
@@ -33,36 +42,34 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-    },
+  const {
+    register,
+    handleSubmit,
+    formState: { errors }
+  } = useForm<SignupFormData>({
+    resolver: zodResolver(signupSchema)
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  const onSubmit = async (formData: SignupFormData) => {
     try {
       setLoading(true);
-      setError(null);
 
-      const data = await fetchWithErrorHandling('/api/signup', {
+      const response = await fetchWithErrorHandling('/api/signup', {
         method: 'POST',
-        body: JSON.stringify({
-          name: values.name,
-          email: values.email,
-          password: values.password,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
       });
 
-      if (data.success) {
-        toast.success('Account created successfully! Please sign in.');
-        router.push("/");
-      } else {
-        throw new Error(data.message || 'Signup failed');
+      const result = await response.json() as ApiResponse;
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create account');
       }
+
+      toast.success('Account created successfully');
+      router.push("/");
     } catch (error) {
       const message = getErrorMessage(error);
       setError(message);
@@ -70,7 +77,7 @@ export default function SignupPage() {
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
     if (sessionLoading) {
@@ -107,20 +114,17 @@ export default function SignupPage() {
       <Card className="w-[350px]">
         <CardHeader>
           <CardTitle>Create an Account</CardTitle>
-          <CardDescription>
-            Enter your details below to create your account
-          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <Form>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               {error && (
                 <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
                   {error}
                 </div>
               )}
               <FormField
-                control={form.control}
+                control={register}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
@@ -133,7 +137,7 @@ export default function SignupPage() {
                 )}
               />
               <FormField
-                control={form.control}
+                control={register}
                 name="email"
                 render={({ field }) => (
                   <FormItem>
@@ -146,7 +150,7 @@ export default function SignupPage() {
                 )}
               />
               <FormField
-                control={form.control}
+                control={register}
                 name="password"
                 render={({ field }) => (
                   <FormItem>
@@ -159,7 +163,7 @@ export default function SignupPage() {
                 )}
               />
               <FormField
-                control={form.control}
+                control={register}
                 name="confirmPassword"
                 render={({ field }) => (
                   <FormItem>

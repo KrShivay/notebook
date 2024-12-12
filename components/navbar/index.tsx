@@ -11,7 +11,7 @@ import {
 } from "../ui/dropdown-menu";
 import { Input } from "../ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet";
-import { CircleUser, Menu, Package2, Search } from "lucide-react";
+import { User2, Menu, Package2, Search } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { toast } from "react-toastify";
 
@@ -93,7 +93,7 @@ export default function Navbar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="icon" className="rounded-full">
-              <CircleUser className="h-5 w-5" />
+              <User2 className="h-5 w-5" />
               <span className="sr-only">Toggle user menu</span>
             </Button>
           </DropdownMenuTrigger>

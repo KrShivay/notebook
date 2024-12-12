@@ -1,12 +1,13 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { connectToDatabase } from '@/lib/mongodb';
-import { Client } from '@/types/supplier';
+import clientPromise from '../../lib/mongodb';
+import { Client } from '@/types/models';
 import { ObjectId } from 'mongodb';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { db } = await connectToDatabase();
-    const collection = db.collection('clients');
+    const client = await clientPromise;
+    const db = client.db("notebook");
+    const collection = db.collection<Client>("clients");
 
     switch (req.method) {
       case 'GET':
@@ -14,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json(clients);
 
       case 'POST':
-        const newClient: Client = {
+        const newClient: Omit<Client, '_id'> = {
           ...req.body,
           createdAt: new Date(),
           updatedAt: new Date()

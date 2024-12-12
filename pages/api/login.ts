@@ -1,88 +1,97 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { connectToDatabase } from '../../lib/mongodb';
-import { v4 as uuidv4 } from 'uuid';
-import { hash, compare } from 'bcryptjs';
-import { AuthResponse } from '@/types/session';
+import { connectToDatabase } from '@/lib/mongodb';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { z } from 'zod';
+
+const loginSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(6, 'Password must be at least 6 characters')
+});
+
+interface LoginResponse {
+  success: boolean;
+  data?: {
+    token: string;
+    user: {
+      _id: string;
+      email: string;
+      name: string;
+    };
+  };
+  error?: string;
+}
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<AuthResponse>
+  res: NextApiResponse<LoginResponse>
 ) {
   if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,
-      message: 'Method not allowed',
+      error: 'Method not allowed'
     });
   }
 
   try {
-    const { email, password, clientInfo } = req.body;
+    // Validate request body
+    const validatedData = loginSchema.parse(req.body);
+    const { email, password } = validatedData;
 
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email and password are required',
-      });
-    }
+    // Connect to database
+    const client = await connectToDatabase();
+    const db = client.db(process.env.MONGODB_DB || 'notebook');
 
-    const { db } = await connectToDatabase().catch((error) => {
-      console.error('Database connection error:', error);
-      throw new Error('Database connection failed');
-    });
-
+    // Find user
     const user = await db.collection('users').findOne({ email });
-
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password',
+        error: 'Invalid email or password'
       });
     }
 
-    const isPasswordValid = await compare(password, user.password);
-
-    if (!isPasswordValid) {
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password',
+        error: 'Invalid email or password'
       });
     }
 
-    // Create session
-    const sessionId = uuidv4();
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '24h' }
+    );
 
-    const session = {
-      sessionId,
-      userId: user._id,
-      email: user.email,
-      createdAt: now,
-      expiresAt,
-      clientInfo: {
-        ...clientInfo,
-        timestamp: now,
-      },
-    };
-
-    await db.collection('sessions').insertOne(session).catch((error) => {
-      console.error('Session creation error:', error);
-      throw new Error('Failed to create session');
-    });
-
-    // Remove sensitive data from session
-    const { userId, ...sessionData } = session;
-
+    // Return success response
     return res.status(200).json({
       success: true,
-      message: 'Login successful',
-      sessionData,
+      data: {
+        token,
+        user: {
+          _id: user._id.toString(),
+          email: user.email,
+          name: user.name
+        }
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
+
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: error.errors[0].message
+      });
+    }
+
     return res.status(500).json({
       success: false,
-      message: error instanceof Error ? error.message : 'An unexpected error occurred',
+      error: 'Internal server error'
     });
   }
 }

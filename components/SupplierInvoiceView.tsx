@@ -1,185 +1,123 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { format } from 'date-fns';
-import { Line } from 'react-chartjs-2';
+import { useEffect, useState } from 'react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ChartOptions
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+import { PopulatedInvoice } from '@/types/models';
 
-interface Invoice {
-  invoiceNumber: string;
-  invoiceDate: string;
-  amount: number;
-  supplier: {
-    name: string;
-  };
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
+interface Props {
+  invoices: PopulatedInvoice[];
+  supplierColors: Record<string, string>;
 }
 
-interface SupplierInvoiceViewProps {
-  invoices: Invoice[];
-  supplierColors: { [key: string]: string };
-}
-
-interface SupplierData {
-  [supplier: string]: {
-    [month: string]: number;
-  };
-}
-
-export default function SupplierInvoiceView({ invoices, supplierColors }: SupplierInvoiceViewProps) {
-  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
-  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
-  const [supplierData, setSupplierData] = useState<SupplierData>({});
-
-  // Get unique months and suppliers
-  const allMonths = Array.from(new Set(invoices.map(invoice => 
-    format(new Date(invoice.invoiceDate), 'MMM yyyy')
-  ))).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-
-  const allSuppliers = Array.from(new Set(invoices.map(invoice => invoice.supplier.name)));
+export default function SupplierInvoiceView({ invoices, supplierColors }: Props) {
+  const [chartData, setChartData] = useState<{
+    labels: string[];
+    datasets: {
+      label: string;
+      data: number[];
+      backgroundColor: string;
+    }[];
+  }>({
+    labels: [],
+    datasets: []
+  });
 
   useEffect(() => {
-    // Process invoice data
-    const data: SupplierData = {};
+    if (!invoices?.length) return;
+
+    // Group invoices by supplier and month
+    const supplierMonthlyData: Record<string, Record<string, number>> = {};
+    
     invoices.forEach(invoice => {
-      const month = format(new Date(invoice.invoiceDate), 'MMM yyyy');
-      const supplier = invoice.supplier.name;
+      const month = new Date(invoice.dueDate).toLocaleString('default', { month: 'long' });
+      const supplierName = invoice.supplier.name;
       
-      if (!data[supplier]) {
-        data[supplier] = {};
+      if (!supplierMonthlyData[supplierName]) {
+        supplierMonthlyData[supplierName] = {};
       }
-      if (!data[supplier][month]) {
-        data[supplier][month] = 0;
+      if (!supplierMonthlyData[supplierName][month]) {
+        supplierMonthlyData[supplierName][month] = 0;
       }
-      data[supplier][month] += invoice.amount;
+      supplierMonthlyData[supplierName][month] += invoice.total;
     });
-    setSupplierData(data);
 
-    // Initialize with all months and suppliers selected
-    setSelectedMonths(allMonths);
-    setSelectedSuppliers(allSuppliers);
-  }, [invoices]);
+    // Get unique months and sort them
+    const monthsArray = invoices.map(invoice => 
+      new Date(invoice.dueDate).toLocaleString('default', { month: 'long' })
+    );
+    const uniqueMonths = Array.from(new Set(monthsArray));
+    const months = uniqueMonths.sort((a, b) => {
+      const monthOrder = ["January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"];
+      return monthOrder.indexOf(a) - monthOrder.indexOf(b);
+    });
 
-  const chartData = {
-    labels: selectedMonths,
-    datasets: selectedSuppliers.map(supplier => {
-      const color = supplierColors[supplier] || supplierColors['Default'];
-      return {
-        label: supplier,
-        data: selectedMonths.map(month => supplierData[supplier]?.[month] || 0),
-        borderColor: color,
-        backgroundColor: color.replace('1)', '0.2)'),
-        borderWidth: 2,
-        fill: true,
-        tension: 0.1
-      };
-    })
-  };
+    // Create datasets for each supplier
+    const datasets = Object.entries(supplierMonthlyData).map(([supplier, monthlyData]) => ({
+      label: supplier,
+      data: months.map(month => monthlyData[month] || 0),
+      backgroundColor: supplierColors[supplier] || supplierColors.Default
+    }));
 
-  const chartOptions = {
+    setChartData({
+      labels: months,
+      datasets
+    });
+  }, [invoices, supplierColors]);
+
+  const options: ChartOptions<'bar'> = {
     responsive: true,
-    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: 'Monthly Invoice Distribution by Supplier',
+      },
+    },
     scales: {
       y: {
+        type: 'linear' as const,
         beginAtZero: true,
         ticks: {
-          callback: (value: number) => `₹${value.toLocaleString()}`
-        }
-      }
-    },
-    plugins: {
-      tooltip: {
-        callbacks: {
-          label: (context: any) => {
-            const value = context.raw as number;
-            return `${context.dataset.label}: ₹${value.toLocaleString()}`;
+          callback: function(value: number | string) {
+            if (typeof value === 'number') {
+              return `₹${value.toLocaleString()}`;
+            }
+            return value;
           }
         }
       }
-    },
-    interaction: {
-      intersect: false,
-      mode: 'index' as const
     }
   };
 
   return (
-    <Card className="col-span-7">
-      <CardHeader>
-        <CardTitle>Supplier Invoice Analysis</CardTitle>
-        <CardDescription>Compare invoice data across suppliers and months</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div>
-            <div className="text-sm font-medium mb-2">Select Months</div>
-            <div className="grid grid-cols-3 gap-2">
-              {allMonths.map(month => (
-                <div key={month} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id={`month-${month}`}
-                    checked={selectedMonths.includes(month)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedMonths([...selectedMonths, month].sort(
-                          (a, b) => new Date(a).getTime() - new Date(b).getTime()
-                        ));
-                      } else {
-                        setSelectedMonths(selectedMonths.filter(m => m !== month));
-                      }
-                    }}
-                    className="rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <label
-                    htmlFor={`month-${month}`}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    {month}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className="text-sm font-medium mb-2">Select Suppliers</div>
-            <div className="grid grid-cols-2 gap-2">
-              {allSuppliers.map(supplier => (
-                <div key={supplier} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id={`supplier-${supplier}`}
-                    checked={selectedSuppliers.includes(supplier)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedSuppliers([...selectedSuppliers, supplier]);
-                      } else {
-                        setSelectedSuppliers(selectedSuppliers.filter(s => s !== supplier));
-                      }
-                    }}
-                    className="rounded border-gray-300 text-primary focus:ring-primary"
-                    style={{
-                      accentColor: supplierColors[supplier] || supplierColors['Default']
-                    }}
-                  />
-                  <label
-                    htmlFor={`supplier-${supplier}`}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    {supplier}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
+    <div className="w-full h-[400px] p-4">
+      {chartData.labels.length > 0 ? (
+        <Bar options={options} data={chartData} />
+      ) : (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-gray-500">No invoice data available</p>
         </div>
-        <div className="h-[400px]">
-          {selectedMonths.length > 0 && selectedSuppliers.length > 0 ? (
-            <Line data={chartData} options={chartOptions} />
-          ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
-              Please select at least one month and supplier to view data
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 }

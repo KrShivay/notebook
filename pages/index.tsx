@@ -4,16 +4,15 @@ import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader } from "@/components/ui/loader";
 import { useSession } from "@/context/SessionContext";
 import { getClientInfo } from "@/utils/client-info";
-import { fetchWithErrorHandling, getErrorMessage } from "@/utils/api-error";
+import { fetchWithErrorHandling } from "@/utils/api-error";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import Link from "next/link";
-import { AuthResponse } from "@/types/session";
 
 const formSchema = z.object({
   email: z.string().email(),
@@ -57,7 +56,7 @@ export default function LoginPage() {
         };
       });
 
-      const data = await fetchWithErrorHandling<AuthResponse>('/api/login', {
+      const data = await fetchWithErrorHandling('/api/login', {
         method: 'POST',
         body: JSON.stringify({
           ...values,
@@ -65,7 +64,7 @@ export default function LoginPage() {
         }),
       });
 
-      if (data.success && data.sessionData) {
+      if (data.success) {
         // Store session in sessionStorage
         sessionStorage.setItem('session', JSON.stringify(data.sessionData));
         setSession(data.sessionData);
@@ -75,7 +74,7 @@ export default function LoginPage() {
         throw new Error(data.message || 'Login failed');
       }
     } catch (error) {
-      const message = getErrorMessage(error);
+      const message = error.message;
       setError(message);
       toast.error(message);
     } finally {
@@ -118,9 +117,6 @@ export default function LoginPage() {
       <Card className="w-[350px]">
         <CardHeader>
           <CardTitle>Login</CardTitle>
-          <CardDescription>
-            Enter your email below to login to your account
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -167,7 +163,7 @@ export default function LoginPage() {
                 )}
               </Button>
               <div className="text-center text-sm">
-                Don't have an account?{' '}
+                Don&apos;t have an account?{' '}
                 <Link href="/signup" className="text-primary hover:underline">
                   Sign up
                 </Link>

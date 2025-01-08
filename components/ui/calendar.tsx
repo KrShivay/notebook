@@ -52,13 +52,17 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        Dropdown: ({ value, onChange, children, ...props }) => (
+        Dropdown: ({ value, onChange, options, ...props }) => (
           <select
             value={value}
             onChange={onChange}
             {...props}
           >
-            {children}
+            {options?.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.text}
+              </option>
+            ))}
           </select>
         ),
         IconLeft: () => <ChevronLeft className="h-4 w-4" />,

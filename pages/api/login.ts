@@ -57,11 +57,11 @@ export default async function handler(
       sessionId,
       userId: user._id,
       email: user.email,
-      createdAt: now,
-      expiresAt,
+      createdAt: now.toISOString(),
+      expiresAt: expiresAt.toISOString(),
       clientInfo: {
         ...clientInfo,
-        timestamp: now,
+        timestamp: now.toISOString(),
       },
     };
 

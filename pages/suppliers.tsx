@@ -21,7 +21,7 @@ const supplierSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   address: z.string().min(5, 'Address must be at least 5 characters'),
-  rate: z.string().transform((val) => Number(val)),
+  rate: z.number().min(0, 'Rate must be a positive number'),
   bankDetails: z.object({
     accountNumber: z.string().min(8, 'Account number must be at least 8 characters'),
     ifscCode: z.string().min(11, 'IFSC code must be 11 characters').max(11),
@@ -51,7 +51,7 @@ export default function SuppliersPage() {
       name: '',
       email: '',
       address: '',
-      rate: '',
+      rate: 0,
       bankDetails: {
         accountNumber: '',
         ifscCode: '',
@@ -193,7 +193,13 @@ export default function SuppliersPage() {
                       <FormItem>
                         <FormLabel>Rate (per day)</FormLabel>
                         <FormControl>
-                          <Input type="number" placeholder="Enter daily rate" {...field} />
+                          <Input 
+                            type="number" 
+                            placeholder="Enter daily rate" 
+                            {...field}
+                            onChange={e => field.onChange(Number(e.target.value))}
+                            value={field.value === 0 ? '' : field.value}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { format } from 'date-fns';
 import { Line } from 'react-chartjs-2';
+import { ChartOptions } from 'chart.js';
 
 interface Invoice {
   invoiceNumber: string;
@@ -73,21 +74,24 @@ export default function SupplierInvoiceView({ invoices, supplierColors }: Suppli
     })
   };
 
-  const chartOptions = {
+  const chartOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
       y: {
         beginAtZero: true,
         ticks: {
-          callback: (value: number) => `₹${value.toLocaleString()}`
+          callback: function(tickValue: number | string) {
+            const value = Number(tickValue);
+            return `₹${value.toLocaleString()}`;
+          }
         }
       }
     },
     plugins: {
       tooltip: {
         callbacks: {
-          label: (context: any) => {
+          label: function(context) {
             const value = context.raw as number;
             return `${context.dataset.label}: ₹${value.toLocaleString()}`;
           }
@@ -96,7 +100,7 @@ export default function SupplierInvoiceView({ invoices, supplierColors }: Suppli
     },
     interaction: {
       intersect: false,
-      mode: 'index' as const
+      mode: 'index'
     }
   };
 

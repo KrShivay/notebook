@@ -33,9 +33,9 @@ import { toast } from 'react-toastify';
 
 const formSchema = z.object({
   supplier: z.string(),
-  invoiceDate: z.date(),
+  invoiceDate: z.date().optional(),
   client: z.string(),
-  monthYear: z.date(),
+  monthYear: z.date().optional(),
   days: z.string()
     .refine(val => !isNaN(parseInt(val)) && parseInt(val) > 0 && parseInt(val) <= 31, {
       message: "Days must be between 1 and 31"
@@ -44,9 +44,9 @@ const formSchema = z.object({
 
 type FormValues = {
   supplier: string;
-  invoiceDate: Date;
+  invoiceDate?: Date;
   client: string;
-  monthYear: Date;
+  monthYear?: Date;
   days: string;
 };
 
@@ -76,8 +76,8 @@ const GenerateInvoice = () => {
     defaultValues: {
       supplier: formData.supplier || "",
       client: formData.client || "",
-      invoiceDate: formData.invoiceDate || null,
-      monthYear: formData.monthYear || null,
+      invoiceDate: formData.invoiceDate || undefined,
+      monthYear: formData.monthYear || undefined,
       days: formData.days || "",
     },
   });
@@ -105,9 +105,14 @@ const GenerateInvoice = () => {
         return;
       }
 
+      if (!values.monthYear || !values.invoiceDate) {
+        toast.error('Please select both month and invoice date');
+        return;
+      }
+
       const amount = parseInt(values.days) * supplier.rate;
       
-      const monthYear = new Date(values.monthYear);
+      const monthYear = values.monthYear;
       const invoiceData = {
         invoiceNumber: generateInvoiceNumber(values.supplier),
         invoiceDate: format(values.invoiceDate, 'dd MMM yyyy'),
@@ -220,7 +225,7 @@ const GenerateInvoice = () => {
                       <div className="relative">
                         <DatePicker
                           selected={field.value}
-                          onChange={(date: Date) => field.onChange(date)}
+                          onChange={(date: Date | null) => field.onChange(date || undefined)}
                           dateFormat="dd/MM/yyyy"
                           maxDate={new Date()}
                           placeholderText="Select invoice date"
@@ -243,9 +248,10 @@ const GenerateInvoice = () => {
                       <div className="relative">
                         <DatePicker
                           selected={field.value}
-                          onChange={(date: Date) => field.onChange(date)}
+                          onChange={(date: Date | null) => field.onChange(date || undefined)}
                           dateFormat="MMMM yyyy"
                           showMonthYearPicker
+                          maxDate={new Date()}
                           placeholderText="Select month and year"
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         />

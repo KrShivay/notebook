@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import Link from "next/link";
+import { AuthResponse } from "@/types/session";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -48,7 +49,7 @@ export default function SignupPage() {
       setLoading(true);
       setError(null);
 
-      const data = await fetchWithErrorHandling('/api/signup', {
+      const data: AuthResponse = await fetchWithErrorHandling('/api/signup', {
         method: 'POST',
         body: JSON.stringify({
           name: values.name,

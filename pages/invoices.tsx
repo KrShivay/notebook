@@ -27,16 +27,20 @@ interface Invoice {
     name: string;
     email: string;
     address?: string;
+    gstin?: string;
   };
   supplier: {
     name: string;
     email: string;
     address?: string;
     rate: number;
+    pan?: string;
     bankDetails?: {
+      accountName?: string;
       accountNumber: string;
       ifscCode: string;
       bankName: string;
+      branch?: string;
     };
   };
   createdAt: string;
@@ -149,7 +153,37 @@ export default function Invoices() {
           </DialogHeader>
           {selectedInvoice && (
             <div className="mt-4">
-              <InvoiceComponent data={selectedInvoice} />
+              <InvoiceComponent data={{
+                ...selectedInvoice,
+                supplier: {
+                  ...selectedInvoice.supplier,
+                  address: {
+                    street: selectedInvoice.supplier.address || '',
+                    city: '',
+                    state: '',
+                    pincode: ''
+                  },
+                  pan: selectedInvoice.supplier.pan || '',
+                  bankDetails: {
+                    accountName: selectedInvoice.supplier.bankDetails?.accountName || selectedInvoice.supplier.name,
+                    accountNumber: selectedInvoice.supplier.bankDetails?.accountNumber || '',
+                    bankName: selectedInvoice.supplier.bankDetails?.bankName || '',
+                    ifscCode: selectedInvoice.supplier.bankDetails?.ifscCode || '',
+                    branch: selectedInvoice.supplier.bankDetails?.branch || ''
+                  },
+                  rate: selectedInvoice.supplier.rate
+                },
+                client: {
+                  ...selectedInvoice.client,
+                  address: {
+                    street: selectedInvoice.client.address || '',
+                    city: '',
+                    state: '',
+                    pincode: ''
+                  },
+                  gstin: selectedInvoice.client.gstin || ''
+                }
+              }} />
             </div>
           )}
         </DialogContent>

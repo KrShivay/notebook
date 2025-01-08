@@ -75,16 +75,20 @@ interface Invoice {
     name: string;
     email: string;
     address?: string;
+    gstin?: string;
   };
   supplier: {
     name: string;
     email: string;
     address?: string;
     rate: number;
+    pan?: string;
     bankDetails?: {
+      accountName?: string;
       accountNumber: string;
       ifscCode: string;
       bankName: string;
+      branch?: string;
     };
   };
   createdAt: string;
@@ -125,7 +129,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [monthlyData, setMonthlyData] = useState<{ name: string; total: number; }[]>([]);
   const [supplierData, setSupplierData] = useState<SupplierData[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [data, setData] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -173,8 +177,9 @@ export default function Dashboard() {
 
         console.log('Fetching invoices for email:', session.email);
 
-        const startDate = startOfMonth(selectedDate);
-        const endDate = endOfMonth(selectedDate);
+        const currentDate = selectedDate || new Date();
+        const startDate = startOfMonth(currentDate);
+        const endDate = endOfMonth(currentDate);
 
         const data = await fetchWithErrorHandling<Invoice[]>(
           `/api/invoices?email=${encodeURIComponent(session.email)}`
@@ -303,7 +308,7 @@ export default function Dashboard() {
             <div className="w-48">
               <DatePicker
                 selected={selectedDate}
-                onChange={(date: Date) => setSelectedDate(date)}
+                onChange={(date: Date | null) => setSelectedDate(date || new Date())}
                 dateFormat="MMMM yyyy"
                 showMonthYearPicker
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -337,7 +342,7 @@ export default function Dashboard() {
                   ₹{supplierData.reduce((sum, supplier) => sum + supplier.total, 0).toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {format(selectedDate, 'MMMM yyyy')}
+                  {format(selectedDate || new Date(), 'MMMM yyyy')}
                 </p>
               </CardContent>
             </Card>
@@ -436,7 +441,7 @@ export default function Dashboard() {
             <Card className="col-span-3">
               <CardHeader>
                 <CardTitle>Supplier Overview</CardTitle>
-                <CardDescription>Revenue by supplier for {format(selectedDate, 'MMMM yyyy')}</CardDescription>
+                <CardDescription>Revenue by supplier for {format(selectedDate || new Date(), 'MMMM yyyy')}</CardDescription>
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -641,7 +646,37 @@ export default function Dashboard() {
           </DialogHeader>
           {selectedInvoice && (
             <div className="mt-4">
-              <InvoiceComponent data={selectedInvoice} />
+              <InvoiceComponent data={{
+                ...selectedInvoice,
+                supplier: {
+                  ...selectedInvoice.supplier,
+                  address: {
+                    street: selectedInvoice.supplier.address || '',
+                    city: '',
+                    state: '',
+                    pincode: ''
+                  },
+                  pan: selectedInvoice.supplier.pan || '',
+                  bankDetails: {
+                    accountName: selectedInvoice.supplier.bankDetails?.accountName || selectedInvoice.supplier.name,
+                    accountNumber: selectedInvoice.supplier.bankDetails?.accountNumber || '',
+                    bankName: selectedInvoice.supplier.bankDetails?.bankName || '',
+                    ifscCode: selectedInvoice.supplier.bankDetails?.ifscCode || '',
+                    branch: selectedInvoice.supplier.bankDetails?.branch || ''
+                  },
+                  rate: selectedInvoice.supplier.rate
+                },
+                client: {
+                  ...selectedInvoice.client,
+                  address: {
+                    street: selectedInvoice.client.address || '',
+                    city: '',
+                    state: '',
+                    pincode: ''
+                  },
+                  gstin: selectedInvoice.client.gstin || ''
+                }
+              }} />
             </div>
           )}
         </DialogContent>

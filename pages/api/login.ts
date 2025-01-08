@@ -31,7 +31,7 @@ export default async function handler(
     });
 
     const user = await db.collection('users').findOne({ email });
-
+    console.log("log >>>>>>>>>>>>",{user, email, password})
     if (!user) {
       return res.status(401).json({
         success: false,

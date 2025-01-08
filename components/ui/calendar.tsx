@@ -60,7 +60,7 @@ function Calendar({
           >
             {options?.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.text}
+                {option.label}
               </option>
             ))}
           </select>

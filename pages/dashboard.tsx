@@ -8,7 +8,15 @@ import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 import { Bar, Line } from 'react-chartjs-2';
-import { IndianRupee, TrendingUp, Users, FileText } from 'lucide-react';
+import { IndianRupee, TrendingUp, Users, FileText, Eye } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import InvoiceComponent from '../components/InvoiceComponent';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -23,6 +31,7 @@ import {
 
 import SupplierInvoiceView from "../components/SupplierInvoiceView";
 
+// Register ChartJS components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -51,26 +60,47 @@ const MONTH_COLORS = [
   'rgba(249, 115, 22, 0.8)'   // Orange
 ];
 
-const SUPPLIER_COLORS = {
-  'Joel': 'rgba(147, 51, 234, 1)',      // Purple
-  'Shubhlika': 'rgba(59, 130, 246, 1)', // Blue
-  'Ayushi': 'rgba(16, 185, 129, 1)',    // Green
-  'Scorich': 'rgba(245, 158, 11, 1)',   // Amber
-  'YooMoney': 'rgba(239, 68, 68, 1)',   // Red
-  'Default': 'rgba(14, 165, 233, 1)',   // Sky
-};
+const DEFAULT_COLOR = 'rgba(14, 165, 233, 1)'; // Sky blue
 
 interface Invoice {
+  _id: string;
   invoiceNumber: string;
   invoiceDate: string;
+  startDate: string;
+  endDate: string;
+  days: number;
   amount: number;
+  amountInWords: string;
   client: {
     name: string;
+    email: string;
+    address?: string;
   };
   supplier: {
     name: string;
+    email: string;
+    address?: string;
+    rate: number;
+    bankDetails?: {
+      accountNumber: string;
+      ifscCode: string;
+      bankName: string;
+    };
   };
   createdAt: string;
+}
+
+interface Supplier {
+  _id: string;
+  name: string;
+  email: string;
+  address?: string;
+  rate: number;
+  bankDetails?: {
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+  };
 }
 
 interface SupplierData {
@@ -95,6 +125,11 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [monthlyData, setMonthlyData] = useState<{ name: string; total: number; }[]>([]);
   const [supplierData, setSupplierData] = useState<SupplierData[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [data, setData] = useState<Invoice[]>([]);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierColors, setSupplierColors] = useState<Record<string, string>>({});
   const [supplierMonthlyData, setSupplierMonthlyData] = useState<{
     labels: string[];
     datasets: {
@@ -103,8 +138,29 @@ export default function Dashboard() {
       backgroundColor: string;
     }[];
   }>({ labels: [], datasets: [] });
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [data, setData] = useState<Invoice[]>([]);
+
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const data = await fetchWithErrorHandling<Supplier[]>('/api/suppliers');
+        setSuppliers(data);
+        
+        // Generate color mapping for suppliers
+        const colors: Record<string, string> = {};
+        data.forEach((supplier, index) => {
+          colors[supplier.name] = MONTH_COLORS[index % MONTH_COLORS.length].replace('0.8', '1');
+        });
+        colors['Default'] = DEFAULT_COLOR;
+        setSupplierColors(colors);
+      } catch (error) {
+        console.error('Error fetching suppliers:', error);
+      }
+    };
+
+    if (!sessionLoading) {
+      fetchSuppliers();
+    }
+  }, [sessionLoading]);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -196,16 +252,30 @@ export default function Dashboard() {
           }
         });
 
-        const datasets = Object.entries(supplierMonthlyTotals).map(([supplier, monthlyData], index) => ({
+        const monthLabels = last6Months;
+        const datasets = Object.entries(supplierMonthlyTotals).map(([supplier, monthlyData]) => ({
           label: supplier,
-          data: last6Months.map(month => monthlyData[month] || 0),
-          backgroundColor: SUPPLIER_COLORS[supplier] || SUPPLIER_COLORS['Default'],
+          data: monthLabels.map(month => monthlyData[month] || 0),
+          backgroundColor: supplierColors[supplier] || supplierColors['Default'],
         }));
 
         setSupplierMonthlyData({
-          labels: last6Months,
+          labels: monthLabels,
           datasets,
         });
+
+        // Process supplier monthly trends data
+        const supplierMonthlyTrendsData = {
+          labels: last6Months,
+          datasets: Object.entries(supplierMonthlyTotals).map(([supplier, monthlyData], index) => ({
+            label: supplier,
+            data: last6Months.map(month => monthlyData[month] || 0),
+            backgroundColor: supplierColors[supplier] || supplierColors['Default'],
+          })),
+        };
+
+        // Set state
+        // setSupplierMonthlyData(supplierMonthlyData);
       } catch (error) {
         console.error('Error fetching invoices:', error);
         setError(error instanceof Error ? error.message : 'Failed to fetch invoices');
@@ -217,7 +287,7 @@ export default function Dashboard() {
     if (!sessionLoading) {
       fetchInvoices();
     }
-  }, [session?.email, sessionLoading, selectedDate]);
+  }, [session?.email, sessionLoading, selectedDate, supplierColors]);
 
   if (sessionLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
@@ -382,8 +452,12 @@ export default function Dashboard() {
                         labels: supplierData.map(d => d.name),
                         datasets: [{
                           data: supplierData.map(d => d.total),
-                          backgroundColor: supplierData.map(supplier => SUPPLIER_COLORS[supplier.name] || SUPPLIER_COLORS['Default']),
-                          borderColor: supplierData.map(supplier => SUPPLIER_COLORS[supplier.name] || SUPPLIER_COLORS['Default']),
+                          backgroundColor: supplierData.map(supplier => 
+                            supplierColors[supplier.name] || supplierColors['Default']
+                          ),
+                          borderColor: supplierData.map(supplier => 
+                            supplierColors[supplier.name] || supplierColors['Default']
+                          ),
                           borderWidth: 1
                         }]
                       }}
@@ -422,7 +496,7 @@ export default function Dashboard() {
 
           <SupplierInvoiceView 
             invoices={data} 
-            supplierColors={SUPPLIER_COLORS}
+            supplierColors={supplierColors}
           />
 
           <Card className="col-span-7">
@@ -543,6 +617,14 @@ export default function Dashboard() {
                       <div className="ml-auto font-medium">
                         ₹{invoice.amount.toLocaleString()}
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="ml-4"
+                        onClick={() => setSelectedInvoice(invoice)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -551,6 +633,19 @@ export default function Dashboard() {
           </Card>
         </main>
       </ErrorBoundary>
+
+      <Dialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Invoice #{selectedInvoice?.invoiceNumber}</DialogTitle>
+          </DialogHeader>
+          {selectedInvoice && (
+            <div className="mt-4">
+              <InvoiceComponent data={selectedInvoice} />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

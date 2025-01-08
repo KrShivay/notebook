@@ -11,7 +11,7 @@ import {
 } from "../ui/dropdown-menu";
 import { Input } from "../ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet";
-import { CircleUser, Menu, Package2, Search } from "lucide-react";
+import { Menu, Package2, Search, User } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { toast } from "react-toastify";
 
@@ -19,22 +19,27 @@ export default function Navbar() {
   const { session, setSession } = useSession();
   const router = useRouter();
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('session');
-    setSession(null);
-    toast.success('Logged out successfully');
-    router.push('/');
+  const handleLogout = async () => {
+    try {
+      sessionStorage.removeItem('session');
+      setSession(null);
+      toast.success('Logged out successfully');
+      router.push('/');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast.error('Failed to log out');
+    }
   };
 
   return (
-    <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
+    <header className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-gray-100/40 px-6 dark:bg-gray-800/40">
       <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
         <Link
           href="/dashboard"
           className="flex items-center gap-2 text-lg font-semibold md:text-base"
         >
           <Package2 className="h-6 w-6" />
-          <span>Invoice App</span>
+          <span className="w-24">Invoice App</span>
         </Link>
       </nav>
       <nav className="flex items-center space-x-4 lg:space-x-6">
@@ -49,6 +54,18 @@ export default function Navbar() {
           className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
         >
           Invoice
+        </Link>
+        <Link
+          href="/clients"
+          className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+        >
+          Clients
+        </Link>
+        <Link
+          href="/suppliers"
+          className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+        >
+          Suppliers
         </Link>
       </nav>
       <Sheet>
@@ -76,6 +93,18 @@ export default function Navbar() {
             >
               Invoice
             </Link>
+            <Link
+              href="/clients"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Clients
+            </Link>
+            <Link
+              href="/suppliers"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Suppliers
+            </Link>
           </nav>
         </SheetContent>
       </Sheet>
@@ -93,14 +122,36 @@ export default function Navbar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="icon" className="rounded-full">
-              <CircleUser className="h-5 w-5" />
+              <User className="h-5 w-5" />
               <span className="sr-only">Toggle user menu</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>
-              {session?.email || 'My Account'}
-            </DropdownMenuLabel>
+            <DropdownMenuItem>
+              <Link href="/dashboard" className="flex w-full">
+                Dashboard
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Link href="/invoices" className="flex w-full">
+                Invoices
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Link href="/clients" className="flex w-full">
+                Clients
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Link href="/suppliers" className="flex w-full">
+                Suppliers
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Link href="/generate-invoice" className="flex w-full">
+                Generate Invoice
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
               Logout

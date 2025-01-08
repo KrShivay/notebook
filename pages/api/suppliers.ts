@@ -10,12 +10,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     switch (req.method) {
       case 'GET':
-        const suppliers = await collection.find({}).toArray();
+        // Only return active suppliers by default
+        const { showInactive } = req.query;
+        const query = showInactive === 'true' ? {} : { status: { $ne: 'inactive' } };
+        const suppliers = await collection.find(query).toArray();
         return res.status(200).json(suppliers);
 
       case 'POST':
-        const newSupplier: Supplier = {
+        const newSupplier = {
           ...req.body,
+          status: 'active',
           createdAt: new Date(),
           updatedAt: new Date()
         };
@@ -36,13 +40,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
         return res.status(200).json(updatedSupplier);
 
+      case 'PATCH':
+        // For updating status only
+        const { id, status } = req.body;
+        const statusResult = await collection.findOneAndUpdate(
+          { _id: new ObjectId(id) },
+          { 
+            $set: { 
+              status,
+              updatedAt: new Date()
+            } 
+          },
+          { returnDocument: 'after' }
+        );
+        return res.status(200).json(statusResult);
+
       case 'DELETE':
-        const { id } = req.query;
-        await collection.deleteOne({ _id: new ObjectId(id as string) });
+        const { id: deleteId } = req.query;
+        await collection.deleteOne({ _id: new ObjectId(deleteId as string) });
         return res.status(200).json({ message: 'Supplier deleted successfully' });
 
       default:
-        res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
+        res.setHeader('Allow', ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
         return res.status(405).end(`Method ${req.method} Not Allowed`);
     }
   } catch (error) {

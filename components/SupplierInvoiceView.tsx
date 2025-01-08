@@ -60,12 +60,12 @@ export default function SupplierInvoiceView({ invoices, supplierColors }: Suppli
   const chartData = {
     labels: selectedMonths,
     datasets: selectedSuppliers.map(supplier => {
-      const color = supplierColors[supplier] || supplierColors['Default'];
+      const color = supplierColors[supplier] || 'rgba(75, 192, 192, 1)'; // Default color if none is found
       return {
         label: supplier,
         data: selectedMonths.map(month => supplierData[supplier]?.[month] || 0),
         borderColor: color,
-        backgroundColor: color.replace('1)', '0.2)'),
+        backgroundColor: color.includes('rgba') ? color.replace('1)', '0.2)') : `${color}33`, // Add 20% opacity if hex color
         borderWidth: 2,
         fill: true,
         tension: 0.1

@@ -4,16 +4,40 @@ import Navbar from "../components/navbar";
 import { useSession } from "@/context/SessionContext";
 import { fetchWithErrorHandling } from "@/utils/api-error";
 import { format } from 'date-fns';
+import { Button } from "@/components/ui/button";
+import { Eye } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import InvoiceComponent from '../components/InvoiceComponent';
 
 interface Invoice {
+  _id: string;
   invoiceNumber: string;
   invoiceDate: string;
+  startDate: string;
+  endDate: string;
+  days: number;
   amount: number;
+  amountInWords: string;
   client: {
     name: string;
+    email: string;
+    address?: string;
   };
   supplier: {
     name: string;
+    email: string;
+    address?: string;
+    rate: number;
+    bankDetails?: {
+      accountNumber: string;
+      ifscCode: string;
+      bankName: string;
+    };
   };
   createdAt: string;
 }
@@ -23,6 +47,7 @@ export default function Invoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -37,7 +62,6 @@ export default function Invoices() {
           `/api/invoices?email=${encodeURIComponent(session.email)}`
         );
 
-        // Sort by date
         const sortedInvoices = data.sort((a, b) => 
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
@@ -99,11 +123,16 @@ export default function Invoices() {
                         ₹{invoice.amount.toLocaleString()}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {format(new Date(invoice.invoiceDate), 'MMM dd, yyyy')}
+                        {format(new Date(invoice.createdAt), 'MMM dd, yyyy')}
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {invoice.supplier.name}
-                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedInvoice(invoice)}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        View
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -112,6 +141,19 @@ export default function Invoices() {
           </CardContent>
         </Card>
       </main>
+
+      <Dialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Invoice #{selectedInvoice?.invoiceNumber}</DialogTitle>
+          </DialogHeader>
+          {selectedInvoice && (
+            <div className="mt-4">
+              <InvoiceComponent data={selectedInvoice} />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

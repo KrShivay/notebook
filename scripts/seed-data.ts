@@ -15,31 +15,31 @@ console.log('Using MongoDB URI:', uri);
 const suppliers: Omit<Supplier, '_id' | 'createdAt' | 'updatedAt'>[] = [
   {
     name: "Joel",
-    email: "joel@codeium.com",
+    email: "j18320775@gmail.com",
     phone: "+1 234-567-8901",
-    gstin: "29AADCB2230M1ZT",
-    pan: "AADCB2230M",
+    gstin: "",
+    pan: "BWEPJ8564R",
     address: {
-      street: "123 AI Street",
-      city: "Mountain View",
-      state: "California",
-      pincode: "94043"
+      street: "Teachers colony,",
+      city: "Basil Nagar",
+      state: "Khirighat Basti",
+      pincode: "272002"
     },
     bankDetails: {
-      accountName: "Joel",
-      accountNumber: "123456789012",
-      bankName: "Chase Bank",
-      ifscCode: "CHASE001234",
-      branch: "Mountain View"
+      accountName: "Joel James",
+      accountNumber: "6713446142",
+      bankName: "Kotak Mahindra Bank",
+      ifscCode: "KKBK0005199",
+      branch: "Basti"
     },
-    rate: 2000
+    rate: 8686
   },
   {
     name: "Shubhlika",
-    email: "shubhlika@codeium.com",
+    email: "shubhlika119@gmail.com",
     phone: "+1 234-567-8902",
-    gstin: "29AADCB2230M2ZT",
-    pan: "AADCB2230N",
+    gstin: "",
+    pan: "IWBPS2322Q",
     address: {
       street: "456 Tech Avenue",
       city: "Mountain View",
@@ -47,60 +47,60 @@ const suppliers: Omit<Supplier, '_id' | 'createdAt' | 'updatedAt'>[] = [
       pincode: "94043"
     },
     bankDetails: {
-      accountName: "Shubhlika",
-      accountNumber: "123456789013",
-      bankName: "Chase Bank",
-      ifscCode: "CHASE001235",
-      branch: "Mountain View"
+      accountName: "Shubhlika Srivastava",
+      accountNumber: "1854000101066224",
+      bankName: "Punjab National Bank",
+      ifscCode: "PUNB0185400",
+      branch: "Lucknow"
     },
-    rate: 2000
+    rate: 7445
   },
   {
     name: "Ayushi",
-    email: "ayushi@codeium.com",
+    email: "neetu429.b@gmail.com",
     phone: "+1 234-567-8903",
-    gstin: "29AADCB2230M3ZT",
+    gstin: "",
     pan: "AADCB2230P",
     address: {
-      street: "789 Innovation Drive",
-      city: "Mountain View",
-      state: "California",
-      pincode: "94043"
+      street: "F-27 mahendra enclave",
+      city: "Shastri Nagar",
+      state: "Ghaziabad",
+      pincode: "201002"
     },
     bankDetails: {
-      accountName: "Ayushi",
-      accountNumber: "123456789014",
-      bankName: "Chase Bank",
-      ifscCode: "CHASE001236",
-      branch: "Mountain View"
+      accountName: "Neetu Balyan",
+      accountNumber: "35855347145",
+      bankName: "State Bank of India",
+      ifscCode: "SBIN0051016",
+      branch: "Ghaziabad"
     },
-    rate: 2000
+    rate: 6204
   }
 ];
 
 const clients: Omit<Client, '_id' | 'createdAt' | 'updatedAt'>[] = [
   {
-    name: "Scorich",
+    name: "SCORICH",
     email: "billing@scorich.com",
     phone: "+1 234-567-8904",
-    gstin: "29AABCU9603R1ZX",
+    gstin: "06ABCCS0514K1ZK",
     address: {
-      street: "321 Business Park",
-      city: "San Francisco",
-      state: "California",
-      pincode: "94105"
+      street: "SERVICES PVT . LTD.",
+      city: "Orchid Centre,2nd Floor, Golf Course Road",
+      state: "Sector-53, Gurgaon, Haryana, India",
+      pincode: ""
     }
   },
   {
-    name: "YooMoney",
-    email: "finance@yoomoney.com",
+    name: "YOOMONEY",
+    email: "billing@yoomoney.com",
     phone: "+1 234-567-8905",
-    gstin: "29AABCU9603R2ZX",
+    gstin: "",
     address: {
-      street: "654 Finance District",
-      city: "San Francisco",
-      state: "California",
-      pincode: "94105"
+      street: "FINTECH SERVICES PRIVATE LIMITED",
+      city: "SHOP NO 213 SUNCITY , ARCADE SEC-54, ",
+      state: "Gurgaon- 122002, Haryana",
+      pincode: ""
     }
   }
 ];

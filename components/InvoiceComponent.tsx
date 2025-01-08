@@ -92,11 +92,10 @@ const InvoiceComponent: React.FC<InvoiceComponentProps> = ({ data }) => {
               <br />
               PAN: {data?.supplier?.pan}
             </td>
-            <td colSpan={3} style={cellStyles}>
+            <td colSpan={3} style={{...cellStyles, textAlign: "right"}}>
               <strong>Client</strong>
               <br />
-              {data?.client?.name}
-              <br />
+              {data?.client?.name}{" "}
               {data?.client?.address && formatAddress(data.client.address)}
               <br />
               GSTIN/UIN: {data?.client?.gstin}
@@ -117,31 +116,46 @@ const InvoiceComponent: React.FC<InvoiceComponentProps> = ({ data }) => {
           <tr>
             <td style={cellStyles}>01</td>
             <td style={cellStyles}>
-              Software Development charges between {data?.startDate} to {data?.endDate}
+              Software Development charges between {data?.startDate} to{" "}
+              {data?.endDate}
               <br />
               {data?.days} Days @ ₹{data?.supplier?.rate}/Day
             </td>
             <td colSpan={2} style={cellStyles}>
-              ₹{data?.amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <strong>
+                ₹
+                {data?.amount?.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </strong>
             </td>
           </tr>
+
           <tr>
+            <td style={cellStyles}></td>
+            <td style={cellStyles}>Total</td>
             <td colSpan={2} style={cellStyles}>
-              Total
-            </td>
-            <td colSpan={2} style={cellStyles}>
-              ₹{data?.amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <strong>
+                ₹
+                {data?.amount?.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </strong>
             </td>
           </tr>
           <tr>
             <td colSpan={4} style={cellStyles}>
-              Amount in Words: {data?.amountInWords}
+              <strong>Amount in Words: {data?.amountInWords}</strong>
             </td>
           </tr>
           <tr>
+            <td style={cellStyles}>Bank Account Details</td>
+            <td colSpan={4} style={cellStyles}></td>
+          </tr>
+          <tr>
             <td style={cellStyles}>
-              Bank Account Details:
-              <br />
               Name: {data?.supplier?.bankDetails?.accountName}
               <br />
               Bank Name: {data?.supplier?.bankDetails?.bankName}
@@ -149,8 +163,6 @@ const InvoiceComponent: React.FC<InvoiceComponentProps> = ({ data }) => {
               A/C No: {data?.supplier?.bankDetails?.accountNumber}
               <br />
               IFSC: {data?.supplier?.bankDetails?.ifscCode}
-              <br />
-              Branch: {data?.supplier?.bankDetails?.branch}
               <br />
               PAN: {data?.supplier?.pan}
             </td>

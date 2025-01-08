@@ -3,6 +3,7 @@
 import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { DayPicker } from "react-day-picker"
+import { format } from "date-fns"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
@@ -52,6 +53,35 @@ function Calendar({
         ...classNames,
       }}
       components={{
+        CaptionLabel: ({ displayMonth }) => (
+          <span className="text-sm font-medium">
+            {format(displayMonth, "MMMM yyyy")}
+          </span>
+        ),
+        Navigation: ({ onPreviousClick, onNextClick }) => (
+          <div className="space-x-1">
+            <button
+              type="button"
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+              )}
+              onClick={onPreviousClick}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+              )}
+              onClick={onNextClick}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        ),
         Dropdown: ({ value, onChange, options, ...props }) => (
           <select
             value={value}
@@ -65,8 +95,6 @@ function Calendar({
             ))}
           </select>
         ),
-        IconLeft: () => <ChevronLeft className="h-4 w-4" />,
-        IconRight: () => <ChevronRight className="h-4 w-4" />,
       }}
       {...props}
     />

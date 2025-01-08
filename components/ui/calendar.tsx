@@ -54,7 +54,7 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        Caption: ({ displayMonth }: CaptionProps) => (
+        CaptionLabel: ({ displayMonth }: CaptionProps) => (
           <span className="text-sm font-medium">
             {format(displayMonth, "MMMM yyyy")}
           </span>

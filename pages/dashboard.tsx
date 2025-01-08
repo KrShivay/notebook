@@ -7,7 +7,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
-import { Bar, Line } from 'react-chartjs-2';
+import { Bar, Line, Pie } from 'react-chartjs-2';
 import { IndianRupee, TrendingUp, Users, FileText, Eye } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +26,8 @@ import {
   PointElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ArcElement,
 } from 'chart.js';
 
 import SupplierInvoiceView from "../components/SupplierInvoiceView";
@@ -40,7 +41,8 @@ ChartJS.register(
   PointElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ArcElement
 );
 
 import { useRouter } from 'next/router';
@@ -140,6 +142,13 @@ export default function Dashboard() {
       label: string;
       data: number[];
       backgroundColor: string;
+    }[];
+  }>({ labels: [], datasets: [] });
+  const [totalSupplierData, setTotalSupplierData] = useState<{
+    labels: string[];
+    datasets: {
+      data: number[];
+      backgroundColor: string[];
     }[];
   }>({ labels: [], datasets: [] });
 
@@ -279,6 +288,26 @@ export default function Dashboard() {
           })),
         };
 
+        // Process total supplier data for pie chart
+        const totalSupplierTotals = data.reduce((acc, invoice) => {
+          const supplierName = invoice.supplier.name;
+          acc[supplierName] = (acc[supplierName] || 0) + invoice.amount;
+          return acc;
+        }, {} as Record<string, number>);
+
+        const sortedSuppliers = Object.entries(totalSupplierTotals)
+          .sort((a, b) => b[1] - a[1]);
+
+        setTotalSupplierData({
+          labels: sortedSuppliers.map(([name]) => name),
+          datasets: [{
+            data: sortedSuppliers.map(([_, total]) => total),
+            backgroundColor: sortedSuppliers.map(([name]) => 
+              supplierColors[name] || supplierColors['Default']
+            ),
+          }]
+        });
+
         // Set state
         // setSupplierMonthlyData(supplierMonthlyData);
       } catch (error) {
@@ -311,7 +340,7 @@ export default function Dashboard() {
                 onChange={(date: Date | null) => setSelectedDate(date || new Date())}
                 dateFormat="MMMM yyyy"
                 showMonthYearPicker
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3"
               />
             </div>
           </div>
@@ -504,81 +533,35 @@ export default function Dashboard() {
             supplierColors={supplierColors}
           />
 
-          <Card className="col-span-7">
-            <CardHeader>
-              <CardTitle>Supplier Monthly Comparison</CardTitle>
-              <CardDescription>Revenue trends by supplier over last 6 months</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <Line
-                  data={supplierMonthlyData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                        ticks: {
-                          callback: (value) => `₹${Number(value).toLocaleString()}`
-                        }
-                      }
-                    },
-                    plugins: {
-                      tooltip: {
-                        callbacks: {
-                          label: (context) => {
-                            const value = context.raw as number;
-                            return `${context.dataset.label}: ₹${value.toLocaleString()}`;
-                          }
-                        }
-                      }
-                    }
-                  }}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader>
-              <CardTitle>Supplier Monthly Trends</CardTitle>
-              <CardDescription>Revenue by supplier over the last 6 months</CardDescription>
+              <CardTitle>Total Supplier Revenue</CardTitle>
+              <CardDescription>Total revenue by supplier</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <div>Loading data...</div>
               ) : error ? (
                 <div className="text-red-500">{error}</div>
-              ) : supplierMonthlyData.datasets.length === 0 ? (
+              ) : totalSupplierData.labels.length === 0 ? (
                 <div>No data available</div>
               ) : (
                 <div className="h-[400px]">
-                  <Bar
-                    data={supplierMonthlyData}
+                  <Pie
+                    data={totalSupplierData}
                     options={{
                       responsive: true,
                       maintainAspectRatio: false,
-                      scales: {
-                        x: {
-                          stacked: true,
-                        },
-                        y: {
-                          stacked: true,
-                          ticks: {
-                            callback: (value) => `₹${Number(value).toLocaleString()}`
-                          }
-                        }
-                      },
                       plugins: {
                         legend: {
-                          position: 'top' as const,
+                          position: 'right' as const,
                         },
                         tooltip: {
                           callbacks: {
                             label: (context) => {
                               const value = context.raw as number;
-                              return `${context.dataset.label}: ₹${value.toLocaleString()}`;
+                              const label = totalSupplierData.labels[context.dataIndex];
+                              return `${label}: ₹${value.toLocaleString()}`;
                             }
                           }
                         }

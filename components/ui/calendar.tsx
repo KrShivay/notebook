@@ -52,7 +52,15 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        Dropdown: () => null,
+        Dropdown: ({ value, onChange, children, ...props }) => (
+          <select
+            value={value}
+            onChange={onChange}
+            {...props}
+          >
+            {children}
+          </select>
+        ),
         IconLeft: () => <ChevronLeft className="h-4 w-4" />,
         IconRight: () => <ChevronRight className="h-4 w-4" />,
       }}

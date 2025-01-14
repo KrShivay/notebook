@@ -88,7 +88,7 @@ const InvoiceComponent: React.FC<InvoiceComponentProps> = ({ data }) => {
           <tr>
             <td style={cellStyles}>
               {data?.supplier?.name} <br />
-              {data?.supplier?.address && formatAddress(data.supplier.address)}
+              {data?.supplier?.address ? formatAddress(data.supplier.address) : ""}
               <br />
               PAN: {data?.supplier?.pan}
             </td>
@@ -96,7 +96,7 @@ const InvoiceComponent: React.FC<InvoiceComponentProps> = ({ data }) => {
               <strong>Client</strong>
               <br />
               {data?.client?.name}{" "}
-              {data?.client?.address && formatAddress(data.client.address)}
+              {data?.client?.address ? formatAddress(data.client.address) : ""}
               <br />
               GSTIN/UIN: {data?.client?.gstin}
             </td>

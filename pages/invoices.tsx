@@ -157,8 +157,8 @@ export default function Invoices() {
                 ...selectedInvoice,
                 supplier: {
                   ...selectedInvoice.supplier,
-                  address: {
-                    street: selectedInvoice.supplier.address || '',
+                  address: selectedInvoice.supplier.address || {
+                    street:  '',
                     city: '',
                     state: '',
                     pincode: ''
@@ -175,8 +175,8 @@ export default function Invoices() {
                 },
                 client: {
                   ...selectedInvoice.client,
-                  address: {
-                    street: selectedInvoice.client.address || '',
+                  address: selectedInvoice.client.address || {
+                    street: '',
                     city: '',
                     state: '',
                     pincode: ''

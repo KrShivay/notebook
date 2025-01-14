@@ -62,6 +62,8 @@ const InvoiceComponent: React.FC<InvoiceComponentProps> = ({ data }) => {
     border: "1px solid #bfbfbf",
   };
 
+  console.log({supplier:data?.supplier?.address, client: data?.client?.address})
+
   return (
     <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
       <table style={tableStyles}>
@@ -88,7 +90,7 @@ const InvoiceComponent: React.FC<InvoiceComponentProps> = ({ data }) => {
           <tr>
             <td style={cellStyles}>
               {data?.supplier?.name} <br />
-              {console.log({supplier:data?.supplier?.address, client: data?.client?.address})}
+            
               {`${data?.supplier?.address?.street}, ${data?.supplier?.address?.city}, ${data?.supplier?.address?.state} ${data?.supplier?.address?.pincode}`}
               <br />
               PAN: {data?.supplier?.pan}

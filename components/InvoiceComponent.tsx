@@ -88,7 +88,8 @@ const InvoiceComponent: React.FC<InvoiceComponentProps> = ({ data }) => {
           <tr>
             <td style={cellStyles}>
               {data?.supplier?.name} <br />
-              {data?.supplier?.address ?  `${data?.supplier?.address?.street}, ${data?.supplier?.address?.city}, ${data?.supplier?.address?.state} ${data?.supplier?.address?.pincode}` : ""}
+              {console.log({supplier:data?.supplier?.address, client: data?.client?.address})}
+              {`${data?.supplier?.address?.street}, ${data?.supplier?.address?.city}, ${data?.supplier?.address?.state} ${data?.supplier?.address?.pincode}`}
               <br />
               PAN: {data?.supplier?.pan}
             </td>

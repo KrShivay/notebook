@@ -26,22 +26,22 @@ interface Invoice {
   client: {
     name: string;
     email: string;
-    address?: {
-                    street?:  string,
-                    city?: string,
-                    state?: string,
-                    pincode?: string
+    address: {
+                    street:  string,
+                    city: string,
+                    state: string,
+                    pincode: string
                   };
     gstin?: string;
   };
   supplier: {
     name: string;
     email: string;
-    address?: {
-                    street?:  string,
-                    city?: string,
-                    state?: string,
-                    pincode?: string
+    address: {
+                    street:  string,
+                    city: string,
+                    state: string,
+                    pincode: string
                   };
     rate: number;
     pan?: string;
